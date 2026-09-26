@@ -308,7 +308,8 @@ Markdown="false"
     var pct = total ? moved / total * 100 : 0;
     if (!d.plan.count) {
       $('rb-pct').textContent = '\u2014';
-      $('rb-pct-sub').textContent = d.state === 'planning' ? 'Building the plan\u2026' : 'Run a dry run to see what would move';
+      $('rb-pct-sub').textContent = d.state === 'planning' ? 'Building the plan\u2026'
+        : d.state === 'done' ? 'Nothing to move' : 'Run a dry run to see what would move';
     } else if (d.state === 'planned') {
       $('rb-pct').textContent = fmtKiB(total);
       $('rb-pct-sub').textContent = 'planned across ' + d.plan.count + ' moves (dry run)';
@@ -318,7 +319,7 @@ Markdown="false"
     }
     $('rb-bar').style.width = (d.state === 'planned' ? 0 : pct).toFixed(2) + '%';
     $('rb-s-moves').textContent = d.plan.count ? d.done.count + ' / ' + d.plan.count : '\u2014';
-    $('rb-s-skip').textContent = d.plan.count ? String(d.done.skipped + d.plan.left_out) : '\u2014';
+    $('rb-s-skip').textContent = d.plan.count || d.plan.left_out ? String(d.done.skipped + d.plan.left_out) : '\u2014';
     var running = ['running', 'paused'].indexOf(d.state) >= 0;
     var avg = running && d.started && activeSecs(d) > 0 ? moved * 1024 / activeSecs(d) : 0;
     $('rb-s-avg').textContent = avg ? fmtRate(avg) : '\u2014';

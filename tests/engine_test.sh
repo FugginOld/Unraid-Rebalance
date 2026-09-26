@@ -77,6 +77,19 @@ json=$(php "$STATUS")
 check "status.php returns valid JSON with state done" \
   'python3 -c "import json,sys; d=json.loads(sys.argv[1]); assert d[\"state\"]==\"done\" and d[\"done\"][\"count\"]==1 and len(d[\"disks\"])==4" "$json"'
 
+echo "== dry run on a balanced array"
+make_fixture; rm -rf "$T"/mnt/disk*/*               # empty disks: nothing is over target
+bash "$ENGINE" plan; rc=$?
+check "balanced dry run exits 0"             '[[ $rc == 0 && $(st plan_count) == 0 ]]'
+check "balanced dry run says nothing to move" '[[ $(st state) == done && $(st msg) == *"already balanced"* ]]'
+
+echo "== dry run with an over-full disk but nothing eligible"
+make_fixture
+for d in "$T"/mnt/disk1/*/*/; do touch "$d/x.part"; done    # every item on the donor looks in-progress
+bash "$ENGINE" plan; rc=$?
+check "stuck dry run plans nothing"          '[[ $rc == 0 && $(st plan_count) == 0 && $(st plan_skipped) -ge 1 ]]'
+check "stuck dry run does not claim balanced" '[[ $(st state) == done && $(st msg) == "Nothing can be moved"* ]]'
+
 echo "== pause / resume / stop"
 make_fixture extra
 mkdir -p "$T/slow"
