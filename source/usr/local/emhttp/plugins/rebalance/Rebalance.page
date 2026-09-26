@@ -6,11 +6,15 @@ Markdown="false"
 ---
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-.rb{--bg:#121417;--panel:#1b1e22;--deep:#0e1012;--line:#2a2e33;--track:#262a2f;--edge:#3a3f45;--btn:#1f2226;--chip:#23272c;--text:#e8e6e1;--soft:#c9c6bf;--muted:#9aa1a9;
-  --amber:#f0a13a;--amber-t:#ffb85c;--blue:#4f9cf0;--blue-t:#8cc2ff;--grey:#6f7780;--green:#5fd184;--green-t:#93e2ab;--red:#b4473f;--red-t:#ff9b91;
+.rb{--bg:var(--background-color,#121417);--panel:var(--mild-background-color,#1b1e22);--deep:var(--shade-bg-color,#0e1012);--line:var(--table-border-color,#2a2e33);--track:#262a2f;--edge:var(--border-color,#3a3f45);--btn:var(--mild-background-color,#1f2226);--chip:#23272c;--text:var(--text-color,#e8e6e1);--soft:var(--text-color,#c9c6bf);--muted:#9aa1a9;
+  --amber:#f0a13a;--amber-t:#ffb85c;--blue:#4f9cf0;--blue-t:#8cc2ff;--grey:#6f7780;--green:#5fd184;--green-t:#93e2ab;--red:#b4473f;--red-t:#ff9b91;--brand:#f0a13a;--brand-t:#ffb85c;
+  --hov:var(--table-border-color,#2a2e33);--hov-t:#e8e6e1;--mark:#e8e6e1;--tick:#c9c6bf;--field:var(--input-border-color,#6f7780);--ok-bg:#1c3124;--warn-bg:#35280f;--info-bg:#142840;--bad-bg:#3a1a17;--bad-hov:#2a1513;
   --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
   background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;border-radius:14px;padding:28px 32px;
   display:flex;flex-direction:column;gap:22px;box-sizing:border-box;margin:10px 0 30px}
+.Theme--white .rb,.Theme--azure .rb{--bg:var(--background-color,#f2f2f2);--panel:var(--mild-background-color,#f7f9f9);--deep:var(--shade-bg-color,#e8e8e8);--line:var(--table-border-color,#d3d3d3);--edge:var(--border-color,#d3d3d3);--btn:var(--mild-background-color,#f7f9f9);--text:var(--text-color,#1d1b1b);--soft:var(--text-color,#1d1b1b);--field:var(--input-border-color,#1d1b1b);
+  --track:#dde1e6;--chip:#dde1e6;--hov:#dde1e6;--hov-t:#1d1b1b;--mark:#1d1b1b;--tick:#4a5058;--muted:#5b626b;--amber:#955a00;--amber-t:#7a4800;--blue:#2b6cc4;--blue-t:#1d5aa8;--green:#2e8a4e;--green-t:#1e6b3a;--red-t:#a3322a;
+  --ok-bg:#d9efe0;--warn-bg:#f6e3c4;--info-bg:#d8e6f8;--bad-bg:#f7dcd8;--bad-hov:#f7dcd8}
 .rb *{box-sizing:border-box}
 .rb h1,.rb h2{margin:0;color:var(--text);font-weight:600;text-transform:none;letter-spacing:normal}
 .rb .muted{color:var(--muted)} .rb .soft{color:var(--soft)} .rb .mono{font-family:var(--mono)}
@@ -20,17 +24,17 @@ Markdown="false"
 .rb h1{font-family:var(--cond);font-size:38px;line-height:1.1}
 .rb .pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600;background:var(--chip);color:var(--soft)}
 .rb .pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
-.rb .pill.ok{background:#1c3124;color:var(--green-t)} .rb .pill.warn{background:#35280f;color:var(--amber-t)}
-.rb .pill.info{background:#142840;color:var(--blue-t)} .rb .pill.bad{background:#3a1a17;color:var(--red-t)}
+.rb .pill.ok{background:var(--ok-bg);color:var(--green-t)} .rb .pill.warn{background:var(--warn-bg);color:var(--amber-t)}
+.rb .pill.info{background:var(--info-bg);color:var(--blue-t)} .rb .pill.bad{background:var(--bad-bg);color:var(--red-t)}
 .rb .actions{display:flex;gap:10px;flex-wrap:wrap}
 .rb .rb-btn{height:44px!important;padding:0 18px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--edge)!important;
   background:var(--btn)!important;color:var(--text)!important;font:500 14px var(--sans)!important;text-transform:none!important;letter-spacing:normal!important;cursor:pointer;min-width:0!important;
   transition:background-color .15s,border-color .15s,transform .1s}
-.rb .rb-btn:hover{background:var(--line)!important}
-.rb .rb-btn.primary{background:var(--amber)!important;border-color:var(--amber)!important;color:#1a1204!important}
-.rb .rb-btn.primary:hover{background:var(--amber-t)!important}
+.rb .rb-btn:hover{background:var(--hov)!important;color:var(--hov-t)!important}
+.rb .rb-btn.primary{background:var(--brand)!important;border-color:var(--brand)!important;color:#1a1204!important}
+.rb .rb-btn.primary:hover{background:var(--brand-t)!important}
 .rb .rb-btn.danger{background:transparent!important;border-color:var(--red)!important;color:var(--red-t)!important}
-.rb .rb-btn.danger:hover{background:#2a1513!important}
+.rb .rb-btn.danger:hover{background:var(--bad-hov)!important}
 .rb .rb-btn:disabled{opacity:.5;cursor:default}
 .rb .rb-btn:active:not(:disabled){transform:translateY(1px)}
 .rb .rb-btn:focus-visible,.rb summary:focus-visible,.rb a:focus-visible,.rb .check input:focus-visible{outline:2px solid var(--amber-t)!important;outline-offset:2px}
@@ -47,7 +51,7 @@ Markdown="false"
 .rb .label{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
 .rb .h2{font-family:var(--cond);font-size:22px}
 .rb .big{font-family:var(--cond);font-size:60px;font-weight:600;line-height:1}
-.rb .bar{height:12px;background:var(--line);border-radius:6px;overflow:hidden}
+.rb .bar{height:12px;background:var(--track);border-radius:6px;overflow:hidden}
 .rb .bar>div{height:100%;background:var(--amber);border-radius:6px;transition:width .6s ease}
 .rb .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .rb .stat .k{font-size:12px;color:var(--muted)} .rb .stat .v{font-family:var(--mono);font-size:18px}
@@ -67,8 +71,8 @@ Markdown="false"
 .rb .drow{height:26px} .rb .drow.excl{opacity:.45}
 .rb .track{position:relative;height:14px;background:var(--track);border-radius:3px}
 .rb .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .6s ease}
-.rb .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--soft)}
-.rb .tline{position:absolute;top:-5px;bottom:-5px;border-left:2px dashed var(--text)}
+.rb .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tick)}
+.rb .tline{position:absolute;top:-5px;bottom:-5px;border-left:2px dashed var(--mark)}
 .rb .num{font-family:var(--mono);font-size:13px;text-align:right}
 .rb .list .item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
 .rb .list .item .t{font-size:14px;font-weight:500} .rb .list .item .r{font-family:var(--mono);font-size:12px;color:var(--muted)}
@@ -85,7 +89,7 @@ Markdown="false"
 .rb .field{display:flex;flex-direction:column;gap:6px}
 .rb .field label{font-size:13px;color:var(--soft);font-weight:500}
 .rb .field .hint{font-size:12px;color:var(--muted)}
-.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--grey)!important;
+.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--field)!important;
   background:var(--deep)!important;color:var(--text)!important;font:14px var(--mono)!important;width:100%!important;max-width:none!important}
 .rb .field.wide{grid-column:span 2}
 .rb .check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--soft);min-height:40px}
@@ -143,8 +147,8 @@ Markdown="false"
           <span><i class="sw" style="background:var(--amber)"></i>Over target</span>
           <span><i class="sw" style="background:var(--grey)"></i>Within tolerance</span>
           <span><i class="sw" style="background:var(--blue)"></i>Under target</span>
-          <span><i style="height:14px;border-left:2px dashed var(--text)"></i>Target</span>
-          <span><i style="width:2px;height:14px;background:var(--soft)"></i>At start of run</span>
+          <span><i style="height:14px;border-left:2px dashed var(--mark)"></i>Target</span>
+          <span><i style="width:2px;height:14px;background:var(--tick)"></i>At start of run</span>
         </div>
       </div>
       <div class="dgrid axis">
@@ -219,7 +223,7 @@ Markdown="false"
   function svg(path, color) {
     var ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg'), p = document.createElementNS(ns, 'path');
     s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('fill', 'none');
-    s.setAttribute('stroke', color); s.setAttribute('stroke-width', '1.8'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('aria-hidden', 'true');
+    s.style.stroke = color; s.setAttribute('stroke-width', '1.8'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('aria-hidden', 'true');
     s.setAttribute('class', 'ico'); p.setAttribute('d', path); s.appendChild(p); return s;
   }
 
@@ -343,7 +347,7 @@ Markdown="false"
     }
     box.append(el('h2', 'label', 'Now moving \u00b7 item ' + c.idx + ' of ' + d.plan.count));
     box.append(el('div', 'cur-title', c.title));
-    var r = el('div', 'route'); r.append(el('span', 'dtag from', c.src), svg('M1 8h13M10 4l4 4-4 4', '#9aa1a9'), el('span', 'dtag to', c.dst), el('span', 'muted', c.share + ' share'));
+    var r = el('div', 'route'); r.append(el('span', 'dtag from', c.src), svg('M1 8h13M10 4l4 4-4 4', 'var(--muted)'), el('span', 'dtag to', c.dst), el('span', 'muted', c.share + ' share'));
     box.append(r);
     var bar = el('div', 'bar'); var f = el('div'); f.style.width = (c.pct || 0) + '%'; bar.append(f); box.append(bar);
     var left = c.rate ? ' \u00b7 ' + fmtDur(Math.max(0, c.kib * 1024 - c.bytes) / c.rate) + ' left' : '';
@@ -408,7 +412,7 @@ Markdown="false"
     if (!d.history.length) h.append(el('div', 'empty', 'Nothing yet.'));
     d.history.forEach(function (x) {
       var it = el('div', 'item'), l = el('div'); l.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:0';
-      var icon = x.result === 'done' ? svg('M3 8.5l3.2 3L13 4.5', '#5fd184') : x.result === 'skip' ? svg('M4 8h8', '#ffb85c') : svg('M4 4l8 8M12 4l-8 8', '#ff9b91');
+      var icon = x.result === 'done' ? svg('M3 8.5l3.2 3L13 4.5', 'var(--green)') : x.result === 'skip' ? svg('M4 8h8', 'var(--amber-t)') : svg('M4 4l8 8M12 4l-8 8', 'var(--red-t)');
       var txt = el('div'); txt.style.minWidth = '0';
       txt.append(el('div', 't ellip', x.title), el('div', 'r', x.src + ' \u2192 ' + x.dst + (x.result !== 'done' ? ' \u00b7 ' + x.reason : '')));
       l.append(icon, txt);
