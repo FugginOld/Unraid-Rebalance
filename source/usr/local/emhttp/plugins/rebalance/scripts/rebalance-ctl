@@ -22,7 +22,7 @@ case $1 in
     echo "Started: $1" ;;
   pause|resume|stop)
     running || { echo "Nothing is running"; exit 1; }
-    echo "$1" > "$RUN/control"
+    echo "$1" > "$RUN/control.tmp" && mv -f "$RUN/control.tmp" "$RUN/control"   # atomic: the engine polls this file
     echo "Requested: $1" ;;
   abort)
     running || { echo "Nothing is running"; exit 1; }

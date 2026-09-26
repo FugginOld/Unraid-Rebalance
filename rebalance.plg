@@ -17,6 +17,15 @@
         icon="balance-scale" min="6.12.0" support="https://github.com/&author;/&repo;/issues">
 
 <CHANGES>
+###2026.09.26###
+**Added**
+- Pending "pause / stop after this move" requests are shown in the status pill,
+  with a Cancel button.
+
+**Fixed**
+- Elapsed time and average rate no longer count time spent paused.
+- A stop sent while paused could be lost; the control file is now written atomically.
+
 ###2026.09.25###
 **Added**
 - Initial release: proportional array rebalancing with a live web dashboard
