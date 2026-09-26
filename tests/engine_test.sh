@@ -91,12 +91,19 @@ chmod +x "$T/slow/rsync"
 PATH=$T/slow:$PATH setsid bash "$ENGINE" run & sleep 2.5
 check "running with a progress feed"         '[[ $(st state) == running && -s $T/run/progress ]]'
 check "status.php reports current move"      'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"current\"] and d[\"current\"][\"pct\"]>0"'
-echo pause > "$T/run/control"; sleep 5
+echo pause > "$T/run/control"
+check "status.php reports the pending pause" 'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"state\"]==\"running\" and d[\"request\"]==\"pause\""'
+sleep 5
 check "paused after the current move"        '[[ $(st state) == paused && $(st done_count) == 1 ]]'
-echo resume > "$T/run/control"; sleep 2
+check "pause start recorded"                 '[[ $(st paused_since) =~ ^[0-9]+$ ]]'
+sleep 2
+check "status.php counts the ongoing pause"  'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"paused_s\"]>=2"'
+echo resume > "$T/run/control"; sleep 4    # > the 3 s pause poll
 check "resumed"                              '[[ $(st state) == running ]]'
+check "pause time accumulated on resume"     '(( $(st paused_s) >= 2 )) && [[ -z $(st paused_since) ]]'
+check "status.php: no pending request after resume" 'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"request\"]==\"\""'
 echo stop > "$T/run/control"; sleep 5
-check "stopped after the current move"       '[[ $(st state) == stopped && $(st done_count) == 2 ]]'
+check "stopped after the current move"       '[[ $(st state) == stopped ]] && (( $(st done_count) >= 2 && $(st done_count) < 6 ))'
 
 echo "== abort"
 make_fixture extra

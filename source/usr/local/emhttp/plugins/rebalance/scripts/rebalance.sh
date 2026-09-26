@@ -111,15 +111,20 @@ busy_reason() {
 control_word() { cat "$RUN/control" 2>/dev/null; }
 STOP_REQ=0
 
+# paused_s = pause time already over, paused_since = start of the current pause (UI subtracts both from elapsed)
+PAUSED_S=0; PAUSE_T0=0
+pause_begin() { PAUSE_T0=$EPOCHSECONDS; st_set state paused pause_reason "$1" paused_since "$PAUSE_T0"; }
+pause_end() { PAUSED_S=$(( PAUSED_S + EPOCHSECONDS - PAUSE_T0 )); st_set state running pause_reason "" paused_since "" paused_s "$PAUSED_S"; }
+
 check_control() {  # returns 1 when the run should end
   local c; c=$(control_word)
   [[ $c == stop ]] && { STOP_REQ=1; return 1; }
   [[ $c == pause ]] || return 0
-  log "PAUSED by user"; st_set state paused pause_reason "user"
+  log "PAUSED by user"; pause_begin user
   while c=$(control_word); [[ $c == pause ]]; do sleep 3; done
   [[ $c == stop ]] && { STOP_REQ=1; return 1; }
   rm -f "$RUN/control"
-  log "RESUMED by user"; st_set state running pause_reason ""
+  log "RESUMED by user"; pause_end
 }
 
 wait_until_clear() {  # returns 1 if a stop was requested while waiting
@@ -128,14 +133,14 @@ wait_until_clear() {  # returns 1 if a stop was requested while waiting
   [[ $reason == "array stopped" ]] && die "Array was stopped during the run"
   $PAUSE_ON_PARITY || return 0
   log "PAUSED: $reason in progress - waiting"
-  st_set state paused pause_reason "$reason"; notify normal "Paused: $reason in progress"
+  pause_begin "$reason"; notify normal "Paused: $reason in progress"
   while reason=$(busy_reason); [[ -n $reason ]]; do
     [[ $reason == "array stopped" ]] && die "Array was stopped during the run"
     [[ $(control_word) == stop ]] && { STOP_REQ=1; return 1; }
     (( SECONDS - start > MAX_PAUSE_HOURS * 3600 )) && die "Paused over ${MAX_PAUSE_HOURS}h waiting on $reason"
     sleep 30
   done
-  log "RESUMED after $(( (SECONDS - start) / 60 )) min"; st_set state running pause_reason ""
+  log "RESUMED after $(( (SECONDS - start) / 60 )) min"; pause_end
 }
 
 ############################## SHARE RULES ##############################

@@ -164,6 +164,8 @@ echo json_encode([
   'mode'       => $st['mode'] ?? null,
   'msg'        => $st['msg'] ?? '',
   'pause_reason' => $st['pause_reason'] ?? '',
+  'paused_s'   => (int)($st['paused_s'] ?? 0) + ($state === 'paused' && !empty($st['paused_since']) ? max(0, time() - (int)$st['paused_since']) : 0),
+  'request'    => $alive && in_array($req = trim((string)@file_get_contents("$run/control")), ['pause', 'stop'], true) ? $req : '',
   'started'    => isset($st['started']) ? (int)$st['started'] : null,
   'updated'    => isset($st['updated']) ? (int)$st['updated'] : null,
   'turbo'      => $st['turbo'] ?? 'off',

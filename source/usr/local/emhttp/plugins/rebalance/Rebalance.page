@@ -208,6 +208,7 @@ Markdown="false"
     s = Math.max(0, Math.round(s)); var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
     return d ? d + 'd ' + h + 'h ' + m + 'm' : h ? h + 'h ' + m + 'm' : m ? m + ' min' : s + ' s';
   }
+  function activeSecs(d) { return d.now - d.started - (d.paused_s || 0); }
   function fmtTime(t) { return new Date(t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
   function svg(path, color) {
     var ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg'), p = document.createElementNS(ns, 'path');
@@ -252,23 +253,30 @@ Markdown="false"
     var s = STATES[d.state] || [d.state, ''];
     var label = s[0];
     if (d.state === 'paused' && d.pause_reason && d.pause_reason !== 'user') label = 'Paused \u00b7 ' + d.pause_reason;
+    var pending = d.request === 'stop' || (d.request === 'pause' && d.state === 'running') ? d.request : '';
+    if (pending) label += ' \u00b7 ' + (pending === 'pause' ? 'pausing' : 'stopping') + (d.state === 'running' ? ' after this move' : '');
     var pill = $('rb-pill'); pill.className = 'pill ' + s[1]; pill.lastChild.textContent = label;
 
     var meta = [];
     var active = ['planning', 'running', 'paused'].indexOf(d.state) >= 0;
     if (d.started) {
       meta.push((active ? 'Started ' : 'Last run started ') + fmtTime(d.started));
-      if (active) meta.push('Elapsed ' + fmtDur(d.now - d.started));
+      if (active) meta.push('Elapsed ' + fmtDur(activeSecs(d)) + (d.paused_s ? ' (+' + fmtDur(d.paused_s) + ' paused)' : ''));
     } else meta.push('No run yet');
     if (d.updated && active) meta.push('Updated ' + fmtDur(d.now - d.updated) + ' ago');
     $('rb-meta').textContent = meta.join(' \u00b7 ');
 
     var a = $('rb-actions'); a.textContent = '';
     if (d.state === 'running') {
-      a.append(button('Pause after this move', 'pause'), button('Stop after this move', 'stop'), button('Abort now', 'abort', 'danger'));
+      // 'resume' overwrites the pending control word, so it doubles as cancel
+      if (pending === 'pause') a.append(button('Cancel pause', 'resume'), button('Stop after this move', 'stop'));
+      else if (pending === 'stop') a.append(button('Cancel stop', 'resume'));
+      else a.append(button('Pause after this move', 'pause'), button('Stop after this move', 'stop'));
+      a.append(button('Abort now', 'abort', 'danger'));
     } else if (d.state === 'paused') {
       if (d.pause_reason === 'user') a.append(button('Resume', 'resume', 'primary'));
-      a.append(button('Stop', 'stop'), button('Abort now', 'abort', 'danger'));
+      if (pending !== 'stop') a.append(button('Stop', 'stop'));
+      a.append(button('Abort now', 'abort', 'danger'));
     } else if (d.state === 'planning') {
       a.append(button('Abort', 'abort', 'danger'));
     } else {
@@ -312,7 +320,7 @@ Markdown="false"
     $('rb-s-moves').textContent = d.plan.count ? d.done.count + ' / ' + d.plan.count : '\u2014';
     $('rb-s-skip').textContent = d.plan.count ? String(d.done.skipped + d.plan.left_out) : '\u2014';
     var running = ['running', 'paused'].indexOf(d.state) >= 0;
-    var avg = running && d.started && d.now > d.started ? moved * 1024 / (d.now - d.started) : 0;
+    var avg = running && d.started && activeSecs(d) > 0 ? moved * 1024 / activeSecs(d) : 0;
     $('rb-s-avg').textContent = avg ? fmtRate(avg) : '\u2014';
     var rate = cur && cur.rate ? cur.rate : avg;
     $('rb-s-eta').textContent = running && rate ? '\u2248 ' + fmtDur((total - moved) * 1024 / rate) : '\u2014';
