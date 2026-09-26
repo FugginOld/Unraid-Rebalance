@@ -17,6 +17,12 @@
         icon="balance-scale" min="6.12.0" support="https://github.com/&author;/&repo;/issues">
 
 <CHANGES>
+###2026.09.27###
+**Fixed**
+- A dry run that finds nothing to move now says why ("already balanced", or
+  what kept an over-full disk from moving) and sends a notification, instead
+  of showing "Dry run ready" with an empty plan.
+
 ###2026.09.26###
 **Added**
 - Pending "pause / stop after this move" requests are shown in the status pill,

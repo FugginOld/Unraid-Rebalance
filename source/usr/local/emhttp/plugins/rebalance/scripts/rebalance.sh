@@ -367,12 +367,18 @@ report "PROJECTED AFTER"
 summary="$plan_count move(s), $(human "$plan_kib") planned; $plan_skipped item(s) left out (in-progress or hardlinked)"
 log "Plan: $summary"
 
+if (( plan_count == 0 )); then   # EXHAUSTED = a disk was over tolerance but had nothing eligible
+  if (( ${#EXHAUSTED[@]} && plan_skipped )); then msg="Nothing can be moved - $plan_skipped item(s) left out (in-progress or hardlinked), see log"
+  elif (( ${#EXHAUSTED[@]} )); then msg="Nothing can be moved - no receiving disk or size limit fits the over-full disk's items"
+  else msg="Nothing to move - array is already balanced"; fi
+  FINAL=done; st_set state done msg "$msg"; notify normal "$msg"
+  exit 0
+fi
 if [[ $MODE == plan ]]; then
   FINAL=planned; st_set state planned msg "$summary"
   notify normal "Dry run: $summary"
   exit 0
 fi
-(( plan_count > 0 )) || { FINAL=done; st_set state done msg "Nothing to move - array is already balanced"; exit 0; }
 
 # ---------- EXECUTE ----------
 st_set state running
