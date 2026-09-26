@@ -6,7 +6,7 @@ Markdown="false"
 ---
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-.rb{--bg:#121417;--panel:#1b1e22;--deep:#0e1012;--line:#2a2e33;--track:#262a2f;--text:#e8e6e1;--soft:#c9c6bf;--muted:#9aa1a9;
+.rb{--bg:#121417;--panel:#1b1e22;--deep:#0e1012;--line:#2a2e33;--track:#262a2f;--edge:#3a3f45;--btn:#1f2226;--chip:#23272c;--text:#e8e6e1;--soft:#c9c6bf;--muted:#9aa1a9;
   --amber:#f0a13a;--amber-t:#ffb85c;--blue:#4f9cf0;--blue-t:#8cc2ff;--grey:#6f7780;--green:#5fd184;--green-t:#93e2ab;--red:#b4473f;--red-t:#ff9b91;
   --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
   background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;border-radius:14px;padding:28px 32px;
@@ -18,24 +18,24 @@ Markdown="false"
 .rb .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--muted)}
 .rb .title-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0}
 .rb h1{font-family:var(--cond);font-size:38px;line-height:1.1}
-.rb .pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600;background:#23272c;color:var(--soft)}
+.rb .pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600;background:var(--chip);color:var(--soft)}
 .rb .pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
 .rb .pill.ok{background:#1c3124;color:var(--green-t)} .rb .pill.warn{background:#35280f;color:var(--amber-t)}
 .rb .pill.info{background:#142840;color:var(--blue-t)} .rb .pill.bad{background:#3a1a17;color:var(--red-t)}
 .rb .actions{display:flex;gap:10px;flex-wrap:wrap}
-.rb .rb-btn{height:44px!important;padding:0 18px!important;margin:0!important;border-radius:8px!important;border:1px solid #3a3f45!important;
-  background:#1f2226!important;color:var(--text)!important;font:500 14px var(--sans)!important;text-transform:none!important;letter-spacing:normal!important;cursor:pointer;min-width:0!important;
+.rb .rb-btn{height:44px!important;padding:0 18px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--edge)!important;
+  background:var(--btn)!important;color:var(--text)!important;font:500 14px var(--sans)!important;text-transform:none!important;letter-spacing:normal!important;cursor:pointer;min-width:0!important;
   transition:background-color .15s,border-color .15s,transform .1s}
-.rb .rb-btn:hover{background:#2a2e33!important}
+.rb .rb-btn:hover{background:var(--line)!important}
 .rb .rb-btn.primary{background:var(--amber)!important;border-color:var(--amber)!important;color:#1a1204!important}
-.rb .rb-btn.primary:hover{background:#ffb454!important}
+.rb .rb-btn.primary:hover{background:var(--amber-t)!important}
 .rb .rb-btn.danger{background:transparent!important;border-color:var(--red)!important;color:var(--red-t)!important}
 .rb .rb-btn.danger:hover{background:#2a1513!important}
 .rb .rb-btn:disabled{opacity:.5;cursor:default}
 .rb .rb-btn:active:not(:disabled){transform:translateY(1px)}
 .rb .rb-btn:focus-visible,.rb summary:focus-visible,.rb a:focus-visible,.rb .check input:focus-visible{outline:2px solid var(--amber-t)!important;outline-offset:2px}
 .rb summary:focus-visible{outline-offset:-2px}
-.rb .field input[type=text]:focus,.rb .field input[type=number]:focus{border-color:var(--amber)!important;box-shadow:0 0 0 1px var(--amber);outline:2px solid transparent}
+.rb .field input[type=text]:focus,.rb .field input[type=number]:focus{border-color:var(--amber)!important;box-shadow:0 0 0 1px var(--amber);outline:2px solid transparent!important}
 @media (prefers-reduced-motion:reduce){.rb *{transition:none!important}}
 .rb .msg{padding:12px 16px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--soft)}
 .rb .msg.bad{border-color:var(--red);color:var(--red-t)} .rb .msg:empty{display:none}
@@ -78,14 +78,14 @@ Markdown="false"
 .rb .loglines{font-family:var(--mono);font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;gap:4px;overflow-x:auto}
 .rb .loglines div{white-space:pre}
 .rb .loglines .skip{color:var(--amber-t)} .rb .loglines .err{color:var(--red-t)} .rb .loglines .mv{color:var(--text)}
-.rb a{color:var(--amber)} .rb a:hover{color:#ffc06b}
+.rb a{color:var(--amber)} .rb a:hover{color:var(--amber-t)}
 .rb details{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0 24px}
 .rb summary{cursor:pointer;padding:18px 0;font-family:var(--cond);font-size:20px;font-weight:600;list-style-position:inside}
 .rb .form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 24px;padding:4px 0 22px}
 .rb .field{display:flex;flex-direction:column;gap:6px}
 .rb .field label{font-size:13px;color:var(--soft);font-weight:500}
 .rb .field .hint{font-size:12px;color:var(--muted)}
-.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid #3a3f45!important;
+.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--edge)!important;
   background:var(--deep)!important;color:var(--text)!important;font:14px var(--mono)!important;width:100%!important;max-width:none!important}
 .rb .field.wide{grid-column:span 2}
 .rb .check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--soft);min-height:40px}
@@ -118,15 +118,15 @@ Markdown="false"
     <section class="card" style="flex:1.3 1 0">
       <h2 class="label">Overall progress</h2>
       <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
-        <div class="big" id="rb-pct">—</div>
+        <div class="big" id="rb-pct">-</div>
         <div class="soft" id="rb-pct-sub" style="font-size:16px"></div>
       </div>
       <div class="bar"><div id="rb-bar" style="width:0"></div></div>
       <div class="stats">
-        <div class="stat"><div class="k">Moves</div><div class="v" id="rb-s-moves">—</div></div>
-        <div class="stat"><div class="k">Skipped (busy / linked)</div><div class="v" id="rb-s-skip">—</div></div>
-        <div class="stat"><div class="k">Average rate</div><div class="v" id="rb-s-avg">—</div></div>
-        <div class="stat"><div class="k">Finish (at current rate)</div><div class="v" id="rb-s-eta">—</div></div>
+        <div class="stat"><div class="k">Moves</div><div class="v" id="rb-s-moves">-</div></div>
+        <div class="stat"><div class="k">Skipped (busy / linked)</div><div class="v" id="rb-s-skip">-</div></div>
+        <div class="stat"><div class="k">Average rate</div><div class="v" id="rb-s-avg">-</div></div>
+        <div class="stat"><div class="k">Finish (at current rate)</div><div class="v" id="rb-s-eta">-</div></div>
       </div>
     </section>
     <section class="card" style="flex:1 1 0" id="rb-current"></section>
@@ -209,7 +209,7 @@ Markdown="false"
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function fmtKiB(k) { k = Math.max(0, k || 0); return k >= TI ? (k / TI).toFixed(2) + ' TiB' : k >= GI ? (k / GI).toFixed(1) + ' GiB' : (k / KI).toFixed(0) + ' MiB'; }
   function fmtSigned(k) { return (k >= 0 ? '+' : '\u2212') + Math.abs(Math.round(k / GI)) + ' GiB'; }
-  function fmtRate(b) { return b > 0 ? (b / 1e6).toFixed(0) + ' MB/s' : '\u2014'; }
+  function fmtRate(b) { return b > 0 ? (b / 1e6).toFixed(0) + ' MB/s' : '-'; }
   function fmtDur(s) {
     s = Math.max(0, Math.round(s)); var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
     return d ? d + 'd ' + h + 'h ' + m + 'm' : h ? h + 'h ' + m + 'm' : m ? m + ' min' : s + ' s';
@@ -313,7 +313,7 @@ Markdown="false"
     moved = Math.min(moved, total);
     var pct = total ? moved / total * 100 : 0;
     if (!d.plan.count) {
-      $('rb-pct').textContent = '\u2014';
+      $('rb-pct').textContent = '-';
       $('rb-pct-sub').textContent = d.state === 'planning' ? 'Building the plan\u2026'
         : d.state === 'done' ? 'Nothing to move' : 'Run a dry run to see what would move';
     } else if (d.state === 'planned') {
@@ -324,20 +324,20 @@ Markdown="false"
       $('rb-pct-sub').textContent = fmtKiB(moved) + ' of ' + fmtKiB(total) + ' moved';
     }
     $('rb-bar').style.width = (d.state === 'planned' ? 0 : pct).toFixed(2) + '%';
-    $('rb-s-moves').textContent = d.plan.count ? d.done.count + ' / ' + d.plan.count : '\u2014';
-    $('rb-s-skip').textContent = d.plan.count || d.plan.left_out ? String(d.done.skipped + d.plan.left_out) : '\u2014';
+    $('rb-s-moves').textContent = d.plan.count ? d.done.count + ' / ' + d.plan.count : '-';
+    $('rb-s-skip').textContent = d.plan.count || d.plan.left_out ? String(d.done.skipped + d.plan.left_out) : '-';
     var running = ['running', 'paused'].indexOf(d.state) >= 0;
     var avg = running && d.started && activeSecs(d) > 0 ? moved * 1024 / activeSecs(d) : 0;
-    $('rb-s-avg').textContent = avg ? fmtRate(avg) : '\u2014';
+    $('rb-s-avg').textContent = avg ? fmtRate(avg) : '-';
     var rate = cur && cur.rate ? cur.rate : avg;
-    $('rb-s-eta').textContent = running && rate ? '\u2248 ' + fmtDur((total - moved) * 1024 / rate) : '\u2014';
+    $('rb-s-eta').textContent = running && rate ? '\u2248 ' + fmtDur((total - moved) * 1024 / rate) : '-';
   }
 
   function renderCurrent(d) {
     var box = $('rb-current'), c = d.current; box.textContent = '';
     if (!c) {
       box.append(el('h2', 'label', 'Now moving'));
-      var t = d.state === 'paused' ? 'Paused \u2014 ' + (d.pause_reason === 'user' ? 'waiting for Resume' : 'waiting for the ' + d.pause_reason + ' to finish')
+      var t = d.state === 'paused' ? 'Paused \u00b7 ' + (d.pause_reason === 'user' ? 'waiting for Resume' : 'waiting for the ' + d.pause_reason + ' to finish')
             : d.state === 'planning' ? 'Scanning disks and building the plan\u2026' : 'Nothing is moving right now.';
       box.append(el('div', 'muted', t)); return;
     }
