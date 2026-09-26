@@ -1,0 +1,4 @@
+# Everything ships to Linux (Unraid): scripts and the .plg must stay LF even on Windows checkouts
+* text=auto eol=lf
+*.png binary
+*.txz binary

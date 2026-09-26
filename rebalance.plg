@@ -4,11 +4,11 @@
 <!ENTITY author    "FugginOld">
 <!ENTITY repo      "Unraid-Rebalance">
 <!ENTITY version   "2026.09.25">
-<!ENTITY md5       "8998cab9b91259e4789a9f2b56517785">
+<!ENTITY md5       "00000000000000000000000000000000">
 <!ENTITY launch    "Settings/Rebalance">
-<!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/main">
-<!ENTITY pluginURL "&gitURL;/&name;.plg">
+<!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/main/&name;.plg">
 <!ENTITY pkg       "&name;-&version;-x86_64-1">
+<!ENTITY pkgURL    "https://github.com/&author;/&repo;/releases/download/&version;/&pkg;.txz">
 <!ENTITY plugin    "/boot/config/plugins/&name;">
 <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
 ]>
@@ -17,8 +17,11 @@
         icon="balance-scale" min="6.12.0" support="https://github.com/&author;/&repo;/issues">
 
 <CHANGES>
-###2026.09.25
+###2026.09.25###
+**Added**
 - Initial release: proportional array rebalancing with a live web dashboard
+  (Settings -> User Utilities -> Array Rebalance). Dry run, then disk-to-disk
+  moves with pause / stop / abort, live progress and per-disk targets.
 </CHANGES>
 
 <!-- remove packages from older versions -->
@@ -30,7 +33,7 @@ rm -f $(ls &plugin;/&name;-*.txz 2>/dev/null | grep -v '&version;')
 
 <!-- the package -->
 <FILE Name="&plugin;/&pkg;.txz" Run="upgradepkg --install-new">
-<URL>&gitURL;/archive/&pkg;.txz</URL>
+<URL>&pkgURL;</URL>
 <MD5>&md5;</MD5>
 </FILE>
 

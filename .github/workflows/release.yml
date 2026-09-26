@@ -1,0 +1,88 @@
+name: release
+
+# Cut a release by pushing a date tag from main:
+#   1. add a ###2026.09.25### block to <CHANGES> in rebalance.plg, commit, push
+#   2. git tag 2026.09.25 && git push --tags
+#
+# This workflow then runs the tests, builds the .txz, patches the version and
+# md5 entities in rebalance.plg on main, and publishes the release with the
+# package attached. pkgURL is derived from the version entity, so those two
+# are all that change. Unraid clients poll the plg on main, so the patch
+# commit is what ships.
+on:
+  push:
+    tags: ['20*']
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # The plg is patched and pushed to main, so the tag must be main's tip -
+      # otherwise we'd ship a txz built from code the tag doesn't point at.
+      - name: Tag must point at main
+        run: |
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "$GITHUB_REF_NAME^{commit}")" \
+            || { echo "::error::tag $GITHUB_REF_NAME is not main's tip"; exit 1; }
+
+      # Release notes = the CHANGES block written before tagging, with GitHub's
+      # generated commit/PR list appended. No block, no release.
+      - name: Extract changelog for this version
+        run: |
+          awk -v v="###$GITHUB_REF_NAME###" \
+            '$0==v {f=1; next} /^###/ || /<\/CHANGES>/ {f=0} f' rebalance.plg > block.md
+          test -s block.md \
+            || { echo "::error::no ###$GITHUB_REF_NAME### block in rebalance.plg <CHANGES>"; exit 1; }
+          { echo "## Highlights"; echo; cat block.md; } > notes.md
+
+      - name: Build the package
+        run: bash build.sh "$GITHUB_REF_NAME"
+
+      - name: Patch version and md5 in rebalance.plg
+        run: |
+          VER="$GITHUB_REF_NAME"
+          PKG="releases/rebalance-$VER-x86_64-1.txz"
+          MD5=$(md5sum "$PKG" | cut -d' ' -f1)
+          sed -i \
+            -e "s|<!ENTITY version .*|<!ENTITY version   \"$VER\">|" \
+            -e "s|<!ENTITY md5 .*|<!ENTITY md5       \"$MD5\">|" \
+            rebalance.plg
+          # Parse the plg the way the plugin manager will and confirm the
+          # resolved download URL and md5 are exactly what we're publishing.
+          python3 - "$VER" "$MD5" <<'EOF'
+          import sys, xml.etree.ElementTree as E
+          ver, md5 = sys.argv[1], sys.argv[2]
+          root = E.parse('rebalance.plg').getroot()
+          assert root.get('version') == ver, f"version is {root.get('version')}"
+          pkg = [f for f in root.findall('FILE') if f.find('URL') is not None][0]
+          url = pkg.find('URL').text.strip()
+          want = f"/releases/download/{ver}/rebalance-{ver}-x86_64-1.txz"
+          assert url.endswith(want), f"URL {url} does not end with {want}"
+          assert pkg.find('MD5').text.strip() == md5, "md5 mismatch"
+          print("plg OK:", url, md5)
+          EOF
+
+      - name: Commit the bumped plg to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit rebalance.plg -m "Release $GITHUB_REF_NAME"
+          git push origin main
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "releases/rebalance-$GITHUB_REF_NAME-x86_64-1.txz" \
+            -t "$GITHUB_REF_NAME" -F notes.md --generate-notes

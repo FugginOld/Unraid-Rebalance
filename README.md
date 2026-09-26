@@ -46,12 +46,14 @@ tail -f /var/log/rebalance.log
 ## Layout
 
 ```
-rebalance.plg                         plugin manifest (version + MD5 stamped by pkg_build.sh)
+rebalance.plg                         plugin manifest (version + md5 patched by CI on release)
 icon.png                              icon used by the Community Applications listing
-pkg_build.sh                          builds archive/rebalance-<ver>-x86_64-1.txz
-archive/                              built packages (committed; the .plg downloads from here)
+build.sh                              builds releases/rebalance-<ver>-x86_64-1.txz (local test builds)
+tests/engine_test.sh                  integration tests against a fake array (run by CI)
+.github/workflows/test.yml            syntax checks + integration tests on push / PR
+.github/workflows/release.yml         tag -> test -> build -> patch plg -> GitHub release
 source/usr/local/emhttp/plugins/rebalance/
-  Rebalance.page                      dashboard + settings (Settings → User Utilities)
+  Rebalance.page                      dashboard + settings (Settings -> User Utilities)
   default.cfg                         defaults; user settings in /boot/config/plugins/rebalance/rebalance.cfg
   scripts/rebalance.sh                engine: plan / run
   scripts/rebalance-ctl               start / pause / resume / stop / abort
@@ -64,10 +66,16 @@ Runtime state: `/var/local/rebalance/` (status, plan.tsv, history.tsv, progress)
 
 ## Release
 
-```
-./pkg_build.sh            # or ./pkg_build.sh 2026.09.25a for a same-day rebuild
-# add a ###<version> entry to <CHANGES> in rebalance.plg
-git add -A && git commit -m "release <version>" && git push
-```
+Packages are published as GitHub release assets by CI; nothing binary is committed.
+
+1. Add a `###YYYY.MM.DD###` block to `<CHANGES>` in `rebalance.plg`, commit and push to `main`.
+2. Tag main's tip with the same version and push the tag:
+   ```
+   git tag 2026.09.25 && git push --tags
+   ```
+
+`release.yml` then runs the tests, builds the `.txz`, patches `version` and `md5` into `rebalance.plg` (the download URL is derived from the version), commits that to `main`, and publishes the release with the package attached and your changelog block as the notes. It refuses a tag that isn't main's tip or has no matching changelog block. Same-day re-release: use a suffix such as `2026.09.25a` for both the block and the tag.
+
+To test locally: `bash tests/engine_test.sh` and `bash build.sh`.
 
 The Community Applications listing lives in [FugginOld/unraid-templates](https://github.com/FugginOld/unraid-templates) (`plugins/unraid-balance.xml`) and only points at `rebalance.plg` here. Version and changelog are read from the `.plg`, so releases don't touch the template repo.

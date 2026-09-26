@@ -1,0 +1,30 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rsync php-cli >/dev/null
+
+      - name: Syntax
+        run: |
+          bash -n source/usr/local/emhttp/plugins/rebalance/scripts/rebalance.sh
+          bash -n source/usr/local/emhttp/plugins/rebalance/scripts/rebalance-ctl
+          bash -n build.sh
+          for f in source/usr/local/emhttp/plugins/rebalance/include/*.php; do php -l "$f"; done
+          # the plugin manager parses the .plg as XML; a stray & breaks installs
+          python3 -c "import xml.etree.ElementTree as E; E.parse('rebalance.plg')"
+
+      - name: Engine and status integration tests
+        run: bash tests/engine_test.sh
