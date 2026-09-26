@@ -1,0 +1,63 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "rebalance">
+<!ENTITY author    "FugginOld">
+<!ENTITY repo      "Unraid-Rebalance">
+<!ENTITY version   "2026.09.25">
+<!ENTITY md5       "8998cab9b91259e4789a9f2b56517785">
+<!ENTITY launch    "Settings/Rebalance">
+<!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/&repo;/main">
+<!ENTITY pluginURL "&gitURL;/&name;.plg">
+<!ENTITY pkg       "&name;-&version;-x86_64-1">
+<!ENTITY plugin    "/boot/config/plugins/&name;">
+<!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
+]>
+
+<PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;"
+        icon="balance-scale" min="6.12.0" support="https://github.com/&author;/&repo;/issues">
+
+<CHANGES>
+###2026.09.25
+- Initial release: proportional array rebalancing with a live web dashboard
+</CHANGES>
+
+<!-- remove packages from older versions -->
+<FILE Run="/bin/bash">
+<INLINE>
+rm -f $(ls &plugin;/&name;-*.txz 2>/dev/null | grep -v '&version;')
+</INLINE>
+</FILE>
+
+<!-- the package -->
+<FILE Name="&plugin;/&pkg;.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/archive/&pkg;.txz</URL>
+<MD5>&md5;</MD5>
+</FILE>
+
+<!-- post-install -->
+<FILE Run="/bin/bash">
+<INLINE>
+chmod 755 &emhttp;/scripts/*
+[ -f &plugin;/&name;.cfg ] || cp &emhttp;/default.cfg &plugin;/&name;.cfg
+echo ""
+echo "----------------------------------------------------"
+echo " Array Rebalance &version; installed"
+echo " Settings > User Utilities > Array Rebalance"
+echo "----------------------------------------------------"
+echo ""
+</INLINE>
+</FILE>
+
+<!-- uninstall -->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+&emhttp;/scripts/rebalance-ctl abort >/dev/null 2>&amp;1
+sleep 2
+removepkg &pkg; >/dev/null 2>&amp;1
+rm -rf &emhttp; /var/local/&name;
+rm -f &plugin;/*.txz
+echo "Array Rebalance removed (settings kept in &plugin;/&name;.cfg)"
+</INLINE>
+</FILE>
+
+</PLUGIN>

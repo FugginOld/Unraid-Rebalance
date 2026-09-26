@@ -1,0 +1,35 @@
+#!/bin/bash
+# rebalance-ctl plan|run|pause|resume|stop|abort|status
+#   plan    start a dry run (plan only)
+#   run     plan, then move data
+#   pause   finish the current move, then wait
+#   resume  continue after a pause
+#   stop    finish the current move, then end the run
+#   abort   stop immediately (the item being moved is left split across two disks)
+PLUGIN=rebalance
+EMHTTP=/usr/local/emhttp/plugins/$PLUGIN
+RUN=/var/local/$PLUGIN
+mkdir -p "$RUN"
+pid=$(cat "$RUN/pid" 2>/dev/null)
+running() { [[ $pid =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; }
+
+case $1 in
+  plan|run)
+    running && { echo "A rebalance is already running"; exit 1; }
+    rm -f "$RUN/control"
+    setsid nohup "$EMHTTP/scripts/rebalance.sh" "$1" >/dev/null 2>&1 </dev/null &
+    sleep 1
+    echo "Started: $1" ;;
+  pause|resume|stop)
+    running || { echo "Nothing is running"; exit 1; }
+    echo "$1" > "$RUN/control"
+    echo "Requested: $1" ;;
+  abort)
+    running || { echo "Nothing is running"; exit 1; }
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid"
+    echo "Abort sent" ;;
+  status)
+    running && echo "running (pid $pid)" || echo "idle" ;;
+  *)
+    echo "usage: ${0##*/} plan|run|pause|resume|stop|abort|status"; exit 2 ;;
+esac

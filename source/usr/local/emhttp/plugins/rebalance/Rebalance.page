@@ -1,0 +1,449 @@
+Menu="Utilities"
+Title="Array Rebalance"
+Icon="balance-scale"
+Tag="balance-scale"
+Markdown="false"
+---
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+.rb{--bg:#121417;--panel:#1b1e22;--deep:#0e1012;--line:#2a2e33;--track:#262a2f;--text:#e8e6e1;--soft:#c9c6bf;--muted:#9aa1a9;
+  --amber:#f0a13a;--amber-t:#ffb85c;--blue:#4f9cf0;--blue-t:#8cc2ff;--grey:#6f7780;--green:#5fd184;--green-t:#93e2ab;--red:#b4473f;--red-t:#ff9b91;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;border-radius:14px;padding:28px 32px;
+  display:flex;flex-direction:column;gap:22px;box-sizing:border-box;margin:10px 0 30px}
+.rb *{box-sizing:border-box}
+.rb h1,.rb h2{margin:0;color:var(--text);font-weight:600;text-transform:none;letter-spacing:normal}
+.rb .muted{color:var(--muted)} .rb .soft{color:var(--soft)} .rb .mono{font-family:var(--mono)}
+.rb .head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.rb .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--muted)}
+.rb .title-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0}
+.rb h1{font-family:var(--cond);font-size:38px;line-height:1.1}
+.rb .pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600;background:#23272c;color:var(--soft)}
+.rb .pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+.rb .pill.ok{background:#1c3124;color:var(--green-t)} .rb .pill.warn{background:#35280f;color:var(--amber-t)}
+.rb .pill.info{background:#142840;color:var(--blue-t)} .rb .pill.bad{background:#3a1a17;color:var(--red-t)}
+.rb .actions{display:flex;gap:10px;flex-wrap:wrap}
+.rb .rb-btn{height:44px!important;padding:0 18px!important;margin:0!important;border-radius:8px!important;border:1px solid #3a3f45!important;
+  background:#1f2226!important;color:var(--text)!important;font:500 14px var(--sans)!important;text-transform:none!important;letter-spacing:normal!important;cursor:pointer;min-width:0!important}
+.rb .rb-btn:hover{background:#2a2e33!important}
+.rb .rb-btn.primary{background:var(--amber)!important;border-color:var(--amber)!important;color:#1a1204!important}
+.rb .rb-btn.primary:hover{background:#ffb454!important}
+.rb .rb-btn.danger{background:transparent!important;border-color:var(--red)!important;color:var(--red-t)!important}
+.rb .rb-btn.danger:hover{background:#2a1513!important}
+.rb .rb-btn:disabled{opacity:.5;cursor:default}
+.rb .msg{padding:12px 16px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--soft)}
+.rb .msg.bad{border-color:var(--red);color:var(--red-t)} .rb .msg:empty{display:none}
+.rb .chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.rb .chip{display:flex;flex-direction:column;gap:3px;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.rb .chip .k{font-size:12px;color:var(--muted)} .rb .chip .v{font-size:15px;font-weight:600} .rb .chip .s{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.rb .row{display:flex;gap:22px;align-items:flex-start}
+.rb .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.rb .label{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.rb .h2{font-family:var(--cond);font-size:22px}
+.rb .big{font-family:var(--cond);font-size:60px;font-weight:600;line-height:1}
+.rb .bar{height:12px;background:var(--line);border-radius:6px;overflow:hidden}
+.rb .bar>div{height:100%;background:var(--amber);border-radius:6px;transition:width .6s ease}
+.rb .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.rb .stat .k{font-size:12px;color:var(--muted)} .rb .stat .v{font-family:var(--mono);font-size:18px}
+.rb .route{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;flex-wrap:wrap}
+.rb .dtag{padding:3px 10px;border-radius:6px;border:1px solid}
+.rb .dtag.from{border-color:var(--amber);color:var(--amber-t)} .rb .dtag.to{border-color:var(--blue);color:var(--blue-t)}
+.rb .cur-title{font-family:var(--cond);font-size:28px;font-weight:600;line-height:1.15;word-break:break-word}
+.rb .spread{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:14px}
+.rb .ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb .legend{display:flex;gap:14px;font-size:12px;color:var(--soft);flex-wrap:wrap;justify-content:flex-end}
+.rb .legend span{display:inline-flex;align-items:center;gap:6px}
+.rb .sw{width:12px;height:12px;border-radius:2px;display:inline-block}
+.rb .dgrid{display:grid;grid-template-columns:64px 64px minmax(0,1fr) 64px 100px;gap:12px;align-items:center}
+.rb .axis{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.rb .axis .scale{position:relative;height:14px}
+.rb .axis .scale span{position:absolute;transform:translateX(-50%)}
+.rb .drow{height:26px} .rb .drow.excl{opacity:.45}
+.rb .track{position:relative;height:14px;background:var(--track);border-radius:3px}
+.rb .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .6s ease}
+.rb .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--soft)}
+.rb .tline{position:absolute;top:-5px;bottom:-5px;border-left:2px dashed var(--text)}
+.rb .num{font-family:var(--mono);font-size:13px;text-align:right}
+.rb .list .item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.rb .list .item .t{font-size:14px;font-weight:500} .rb .list .item .r{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.rb .list .empty{color:var(--muted);padding:10px 0;border-top:1px solid var(--line)}
+.rb .ico{flex:none}
+.rb .logbox{background:var(--deep);border:1px solid var(--line);border-radius:12px;padding:18px 22px;display:flex;flex-direction:column;gap:10px}
+.rb .loglines{font-family:var(--mono);font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;gap:4px;overflow-x:auto}
+.rb .loglines div{white-space:pre}
+.rb .loglines .skip{color:var(--amber-t)} .rb .loglines .err{color:var(--red-t)} .rb .loglines .mv{color:var(--text)}
+.rb a{color:var(--amber)} .rb a:hover{color:#ffc06b}
+.rb details{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0 24px}
+.rb summary{cursor:pointer;padding:18px 0;font-family:var(--cond);font-size:20px;font-weight:600;list-style-position:inside}
+.rb .form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 24px;padding:4px 0 22px}
+.rb .field{display:flex;flex-direction:column;gap:6px}
+.rb .field label{font-size:13px;color:var(--soft);font-weight:500}
+.rb .field .hint{font-size:12px;color:var(--muted)}
+.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid #3a3f45!important;
+  background:var(--deep)!important;color:var(--text)!important;font:14px var(--mono)!important;width:100%!important;max-width:none!important}
+.rb .field.wide{grid-column:span 2}
+.rb .check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--soft);min-height:40px}
+.rb .check input{width:18px;height:18px;margin:0;accent-color:var(--amber)}
+.rb .form-actions{grid-column:1/-1;display:flex;align-items:center;gap:14px}
+@media (max-width:1100px){.rb .chips{grid-template-columns:repeat(2,minmax(0,1fr))}.rb .row{flex-direction:column}.rb .row>*{width:100%}.rb .form{grid-template-columns:1fr}.rb .field.wide{grid-column:auto}}
+@media (max-width:640px){.rb{padding:20px 16px}.rb h1{font-size:28px}.rb .big{font-size:44px}.rb .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rb .card{padding:18px 14px}.rb .num{font-size:12px}.rb .drow>div:first-child{font-size:12px}
+  .rb .dgrid{grid-template-columns:44px minmax(0,1fr) 52px 66px;gap:6px}.rb .dsize{display:none}
+  .rb .scale span:not(:first-child):not(:last-child){display:none}
+  .rb .list .item{flex-wrap:wrap;row-gap:4px}.rb .list .item>div:last-child{text-align:left!important}
+  .rb #rb-hist .item>div:last-child{padding-left:26px}
+  .rb .list .item .ellip{white-space:normal}.rb .legend{justify-content:flex-start}}
+</style>
+
+<div class="rb" id="rb">
+  <div class="head">
+    <div>
+      <div class="eyebrow"><?=htmlspecialchars(strtoupper($var['NAME'] ?? 'UNRAID'))?> · UNRAID ARRAY</div>
+      <div class="title-row"><h1>Array Rebalance</h1><span class="pill" id="rb-pill"><i></i><span>Loading</span></span></div>
+      <div class="muted" id="rb-meta">&nbsp;</div>
+    </div>
+    <div class="actions" id="rb-actions"></div>
+  </div>
+
+  <div class="msg" id="rb-msg"></div>
+  <div class="chips" id="rb-chips"></div>
+
+  <div class="row">
+    <section class="card" style="flex:1.3 1 0">
+      <h2 class="label">Overall progress</h2>
+      <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+        <div class="big" id="rb-pct">—</div>
+        <div class="soft" id="rb-pct-sub" style="font-size:16px"></div>
+      </div>
+      <div class="bar"><div id="rb-bar" style="width:0"></div></div>
+      <div class="stats">
+        <div class="stat"><div class="k">Moves</div><div class="v" id="rb-s-moves">—</div></div>
+        <div class="stat"><div class="k">Skipped (busy / linked)</div><div class="v" id="rb-s-skip">—</div></div>
+        <div class="stat"><div class="k">Average rate</div><div class="v" id="rb-s-avg">—</div></div>
+        <div class="stat"><div class="k">Finish (at current rate)</div><div class="v" id="rb-s-eta">—</div></div>
+      </div>
+    </section>
+    <section class="card" style="flex:1 1 0" id="rb-current"></section>
+  </div>
+
+  <div class="row">
+    <section class="card" style="flex:1.6 1 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+        <div>
+          <h2 class="h2">Disk balance</h2>
+          <div class="muted" id="rb-target-line" style="font-size:13px"></div>
+        </div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--amber)"></i>Over target</span>
+          <span><i class="sw" style="background:var(--grey)"></i>Within tolerance</span>
+          <span><i class="sw" style="background:var(--blue)"></i>Under target</span>
+          <span><i style="height:14px;border-left:2px dashed var(--text)"></i>Target</span>
+          <span><i style="width:2px;height:14px;background:var(--soft)"></i>At start of run</span>
+        </div>
+      </div>
+      <div class="dgrid axis">
+        <span>DISK</span><span class="dsize" style="text-align:right">SIZE</span>
+        <div class="scale" id="rb-scale"></div>
+        <span style="text-align:right">USED</span><span style="text-align:right">VS TARGET</span>
+      </div>
+      <div id="rb-disks" style="display:flex;flex-direction:column;gap:6px"></div>
+    </section>
+    <div style="flex:1 1 0;display:flex;flex-direction:column;gap:22px;min-width:0">
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="h2">Up next</h2><span class="muted" id="rb-q-meta" style="font-size:13px"></span></div>
+        <div class="list" id="rb-queue"></div>
+      </section>
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="h2">Recently completed</h2><span class="muted" id="rb-h-meta" style="font-size:13px"></span></div>
+        <div class="list" id="rb-hist"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="logbox">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="label">Log</h2><a href="/plugins/rebalance/include/log.php">Download full log</a></div>
+    <div class="loglines" id="rb-log"></div>
+  </section>
+
+  <details id="rb-settings">
+    <summary>Settings</summary>
+    <form class="form" id="rb-form" onsubmit="return false">
+      <div class="field"><label for="f-TOLERANCE_PCT">Tolerance (% of each disk)</label><input type="number" id="f-TOLERANCE_PCT" name="TOLERANCE_PCT" min="1" max="20"><span class="hint">A disk counts as balanced within this band.</span></div>
+      <div class="field"><label for="f-ITEM_DEPTH">Item depth</label><input type="number" id="f-ITEM_DEPTH" name="ITEM_DEPTH" min="1" max="3"><span class="hint">1 = /Share/&lt;item&gt;, 2 = /Share/&lt;dir&gt;/&lt;item&gt;</span></div>
+      <div class="field"><label for="f-MIN_FREE_GB">Minimum free space (GB)</label><input type="number" id="f-MIN_FREE_GB" name="MIN_FREE_GB" min="0"><span class="hint">Never fill a receiving disk past this.</span></div>
+      <div class="field"><label for="f-MAX_MOVE_GB">Max data per run (GB)</label><input type="number" id="f-MAX_MOVE_GB" name="MAX_MOVE_GB" min="0"><span class="hint">0 = unlimited.</span></div>
+      <div class="field"><label for="f-SKIP_RECENT_MIN">Skip items modified within (min)</label><input type="number" id="f-SKIP_RECENT_MIN" name="SKIP_RECENT_MIN" min="0"><span class="hint">0 = off.</span></div>
+      <div class="field"><label for="f-MAX_PAUSE_HOURS">Give up after pausing (hours)</label><input type="number" id="f-MAX_PAUSE_HOURS" name="MAX_PAUSE_HOURS" min="1"><span class="hint">E.g. a parity check left paused.</span></div>
+      <div class="field"><label for="f-EXCLUDE_SHARES">Exclude shares</label><input type="text" id="f-EXCLUDE_SHARES" name="EXCLUDE_SHARES"><span class="hint">Comma-separated.</span></div>
+      <div class="field"><label for="f-INCLUDE_SHARES">Only these shares</label><input type="text" id="f-INCLUDE_SHARES" name="INCLUDE_SHARES"><span class="hint">Blank = all eligible shares.</span></div>
+      <div class="field"><label for="f-EXCLUDE_DISKS">Exclude disks</label><input type="text" id="f-EXCLUDE_DISKS" name="EXCLUDE_DISKS"><span class="hint">E.g. disk5,disk6</span></div>
+      <div class="field wide"><label for="f-SKIP_PATTERNS">In-progress file patterns</label><input type="text" id="f-SKIP_PATTERNS" name="SKIP_PATTERNS"><span class="hint">Items containing any of these are skipped.</span></div>
+      <div class="field">
+        <label class="check"><input type="checkbox" name="TURBO_WRITE"> Reconstruct write during moves</label>
+        <label class="check"><input type="checkbox" name="PAUSE_ON_PARITY"> Pause for parity check / mover</label>
+        <label class="check"><input type="checkbox" name="NOTIFY"> Unraid notifications</label>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" name="SKIP_OPEN_FILES"> Skip items with open files</label>
+        <label class="check"><input type="checkbox" name="SKIP_HARDLINKED"> Skip items with external hardlinks</label>
+      </div>
+      <div class="form-actions"><button type="button" class="rb-btn primary" id="rb-save">Save settings</button><span class="muted" id="rb-save-msg"></span></div>
+    </form>
+  </details>
+</div>
+
+<script>
+(function () {
+  var CSRF = "<?=$var['csrf_token']?>";
+  var BASE = '/plugins/rebalance/include/';
+  var KI = 1024, GI = 1024 * 1024, TI = GI * 1024;
+  var $ = function (id) { return document.getElementById(id); };
+  var formLoaded = false, busy = false, last = null;
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function fmtKiB(k) { k = Math.max(0, k || 0); return k >= TI ? (k / TI).toFixed(2) + ' TiB' : k >= GI ? (k / GI).toFixed(1) + ' GiB' : (k / KI).toFixed(0) + ' MiB'; }
+  function fmtSigned(k) { return (k >= 0 ? '+' : '\u2212') + Math.abs(Math.round(k / GI)) + ' GiB'; }
+  function fmtRate(b) { return b > 0 ? (b / 1e6).toFixed(0) + ' MB/s' : '\u2014'; }
+  function fmtDur(s) {
+    s = Math.max(0, Math.round(s)); var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+    return d ? d + 'd ' + h + 'h ' + m + 'm' : h ? h + 'h ' + m + 'm' : m ? m + ' min' : s + ' s';
+  }
+  function fmtTime(t) { return new Date(t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  function svg(path, color) {
+    var ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg'), p = document.createElementNS(ns, 'path');
+    s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('fill', 'none');
+    s.setAttribute('stroke', color); s.setAttribute('stroke-width', '1.8'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('aria-hidden', 'true');
+    s.setAttribute('class', 'ico'); p.setAttribute('d', path); s.appendChild(p); return s;
+  }
+
+  var STATES = {
+    idle: ['Idle', ''], planning: ['Planning', 'warn'], planned: ['Dry run ready', 'info'], running: ['Running', 'ok'],
+    paused: ['Paused', 'warn'], stopped: ['Stopped', ''], done: ['Done', 'ok'], aborted: ['Aborted', 'bad'],
+    error: ['Error', 'bad'], stale: ['Engine not running', 'bad']
+  };
+
+  function post(action, extra) {
+    var body = new URLSearchParams(Object.assign({ action: action, csrf_token: CSRF }, extra || {}));
+    busy = true;
+    return fetch(BASE + 'action.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { ok: false, msg: 'Request failed - reload the page and try again' }; })
+      .then(function (j) { busy = false; poll(); return j; });
+  }
+
+  function act(action) {
+    var ask = {
+      run: 'Start moving data now? The plan is rebuilt from the current disk usage first. Moves are disk-to-disk and parity stays valid throughout.',
+      abort: 'Abort immediately? The item being moved right now will be left split across two disks. It stays readable through the user share, but won\u2019t be tidied up automatically.',
+      stop: 'Stop after the current move finishes?'
+    }[action];
+    if (ask && !confirm(ask)) return;
+    post(action).then(function (j) { if (!j.ok) setMsg(j.msg, true); });
+  }
+
+  function button(label, action, cls) {
+    var b = el('button', 'rb-btn' + (cls ? ' ' + cls : ''), label); b.type = 'button';
+    b.addEventListener('click', function () { act(action); }); return b;
+  }
+
+  function setMsg(text, bad) { var m = $('rb-msg'); m.textContent = text || ''; m.className = 'msg' + (bad ? ' bad' : ''); }
+
+  function renderHead(d) {
+    var s = STATES[d.state] || [d.state, ''];
+    var label = s[0];
+    if (d.state === 'paused' && d.pause_reason && d.pause_reason !== 'user') label = 'Paused \u00b7 ' + d.pause_reason;
+    var pill = $('rb-pill'); pill.className = 'pill ' + s[1]; pill.lastChild.textContent = label;
+
+    var meta = [];
+    var active = ['planning', 'running', 'paused'].indexOf(d.state) >= 0;
+    if (d.started) {
+      meta.push((active ? 'Started ' : 'Last run started ') + fmtTime(d.started));
+      if (active) meta.push('Elapsed ' + fmtDur(d.now - d.started));
+    } else meta.push('No run yet');
+    if (d.updated && active) meta.push('Updated ' + fmtDur(d.now - d.updated) + ' ago');
+    $('rb-meta').textContent = meta.join(' \u00b7 ');
+
+    var a = $('rb-actions'); a.textContent = '';
+    if (d.state === 'running') {
+      a.append(button('Pause after this move', 'pause'), button('Stop after this move', 'stop'), button('Abort now', 'abort', 'danger'));
+    } else if (d.state === 'paused') {
+      if (d.pause_reason === 'user') a.append(button('Resume', 'resume', 'primary'));
+      a.append(button('Stop', 'stop'), button('Abort now', 'abort', 'danger'));
+    } else if (d.state === 'planning') {
+      a.append(button('Abort', 'abort', 'danger'));
+    } else {
+      a.append(button('Dry run', 'plan'), button('Start rebalance', 'run', 'primary'));
+    }
+    if (d.state === 'error' || d.state === 'stale') setMsg(d.msg || 'The engine stopped unexpectedly - check the log.', true);
+    else setMsg(d.msg || '', false);
+  }
+
+  function chip(k, v, s) {
+    var c = el('div', 'chip'); c.append(el('div', 'k', k), el('div', 'v', v)); if (s) c.append(el('div', 's', s)); return c;
+  }
+  function renderChips(d) {
+    var A = d.array, wm = { '0': 'Read/modify/write', '1': 'Reconstruct \u00b7 turbo', 'auto': 'Auto' }[A.write_method] || (A.write_method || 'Unknown');
+    var safety = d.cfg.SKIP_OPEN_FILES === 'true' || d.cfg.SKIP_HARDLINKED === 'true';
+    var c = $('rb-chips'); c.textContent = '';
+    c.append(
+      chip('Array', A.state === 'STARTED' ? 'Started' : A.state),
+      chip('Parity check', A.parity ? 'Running' : 'Idle'),
+      chip('Mover', A.mover ? 'Running' : 'Idle'),
+      chip('Write method', wm, A.observed ? 'observed: ' + A.observed : null),
+      chip('Live-safety checks', (safety ? 'On' : 'Off') + (A.docker ? ' \u00b7 Docker running' : ''))
+    );
+  }
+
+  function renderOverall(d) {
+    var total = d.plan.kib, cur = d.current, moved = d.done.kib + (cur ? cur.bytes / 1024 : 0);
+    moved = Math.min(moved, total);
+    var pct = total ? moved / total * 100 : 0;
+    if (!d.plan.count) {
+      $('rb-pct').textContent = '\u2014';
+      $('rb-pct-sub').textContent = d.state === 'planning' ? 'Building the plan\u2026' : 'Run a dry run to see what would move';
+    } else if (d.state === 'planned') {
+      $('rb-pct').textContent = fmtKiB(total);
+      $('rb-pct-sub').textContent = 'planned across ' + d.plan.count + ' moves (dry run)';
+    } else {
+      $('rb-pct').textContent = pct.toFixed(1) + '%';
+      $('rb-pct-sub').textContent = fmtKiB(moved) + ' of ' + fmtKiB(total) + ' moved';
+    }
+    $('rb-bar').style.width = (d.state === 'planned' ? 0 : pct).toFixed(2) + '%';
+    $('rb-s-moves').textContent = d.plan.count ? d.done.count + ' / ' + d.plan.count : '\u2014';
+    $('rb-s-skip').textContent = d.plan.count ? String(d.done.skipped + d.plan.left_out) : '\u2014';
+    var running = ['running', 'paused'].indexOf(d.state) >= 0;
+    var avg = running && d.started && d.now > d.started ? moved * 1024 / (d.now - d.started) : 0;
+    $('rb-s-avg').textContent = avg ? fmtRate(avg) : '\u2014';
+    var rate = cur && cur.rate ? cur.rate : avg;
+    $('rb-s-eta').textContent = running && rate ? '\u2248 ' + fmtDur((total - moved) * 1024 / rate) : '\u2014';
+  }
+
+  function renderCurrent(d) {
+    var box = $('rb-current'), c = d.current; box.textContent = '';
+    if (!c) {
+      box.append(el('h2', 'label', 'Now moving'));
+      var t = d.state === 'paused' ? 'Paused \u2014 ' + (d.pause_reason === 'user' ? 'waiting for Resume' : 'waiting for the ' + d.pause_reason + ' to finish')
+            : d.state === 'planning' ? 'Scanning disks and building the plan\u2026' : 'Nothing is moving right now.';
+      box.append(el('div', 'muted', t)); return;
+    }
+    box.append(el('h2', 'label', 'Now moving \u00b7 item ' + c.idx + ' of ' + d.plan.count));
+    box.append(el('div', 'cur-title', c.title));
+    var r = el('div', 'route'); r.append(el('span', 'dtag from', c.src), svg('M1 8h13M10 4l4 4-4 4', '#9aa1a9'), el('span', 'dtag to', c.dst), el('span', 'muted', c.share + ' share'));
+    box.append(r);
+    var bar = el('div', 'bar'); var f = el('div'); f.style.width = (c.pct || 0) + '%'; bar.append(f); box.append(bar);
+    var left = c.rate ? ' \u00b7 ' + fmtDur(Math.max(0, c.kib * 1024 - c.bytes) / c.rate) + ' left' : '';
+    var sp = el('div', 'spread'); sp.append(el('span', null, fmtKiB(c.bytes / 1024) + ' of ' + fmtKiB(c.kib)), el('span', 'soft', fmtRate(c.rate) + left));
+    box.append(sp);
+    var file = c.file ? c.file.replace(c.rel + '/', '') : 'Preparing\u2026';
+    var fe = el('div', 'mono muted ellip', file); fe.style.fontSize = '12px'; fe.title = file; box.append(fe);
+  }
+
+  function renderDisks(d) {
+    var T = d.target_pct, tol = d.tol_pct, rows = d.disks;
+    $('rb-target-line').textContent = 'Used % per data disk \u00b7 target ' + T.toFixed(2) + '% \u00b7 tolerance \u00b1' + tol + '% of each disk';
+    var lo = 100;
+    rows.forEach(function (x) {
+      lo = Math.min(lo, x.used / x.size * 100);
+      if (x.start_used != null) lo = Math.min(lo, x.start_used / x.size * 100);
+    });
+    lo = Math.max(0, Math.min(Math.floor((Math.min(lo, T) - 3) / 10) * 10, 90));
+    var pos = function (p) { return Math.max(0, Math.min(100, (p - lo) / (100 - lo) * 100)).toFixed(2) + '%'; };
+
+    var sc = $('rb-scale'); sc.textContent = '';
+    var step = 100 - lo > 60 ? 20 : 10;
+    for (var v = lo; v <= 100; v += step) {
+      var s = el('span', null, v + '%');
+      s.style.left = pos(v); if (v === lo) s.style.transform = 'none'; if (v === 100) s.style.transform = 'translateX(-100%)';
+      sc.append(s);
+    }
+    var box = $('rb-disks'); box.textContent = '';
+    rows.forEach(function (x) {
+      var pct = x.used / x.size * 100, delta = x.used - x.size * T / 100, band = x.size * tol / 100;
+      var st = x.excluded ? 'excl' : delta > band ? 'over' : delta < -band ? 'under' : 'ok';
+      var row = el('div', 'dgrid drow' + (x.excluded ? ' excl' : ''));
+      row.append(el('div', 'mono', x.name));
+      var sz = el('div', 'muted dsize', (x.size / TI).toFixed(1) + ' TiB'); sz.style.cssText = 'font-size:12px;text-align:right'; row.append(sz);
+      var tr = el('div', 'track'), fill = el('div', 'fill');
+      fill.style.width = pos(pct); fill.style.background = { over: 'var(--amber)', under: 'var(--blue)', ok: 'var(--grey)', excl: 'var(--grey)' }[st];
+      tr.append(fill);
+      if (x.start_used != null) { var tk = el('div', 'tick'); tk.style.left = pos(x.start_used / x.size * 100); tr.append(tk); }
+      if (!x.excluded) { var tl = el('div', 'tline'); tl.style.left = pos(T); tr.append(tl); }
+      row.append(tr);
+      row.append(el('div', 'num', pct.toFixed(2) + '%'));
+      var dn = el('div', 'num', x.excluded ? 'excluded' : fmtSigned(delta));
+      dn.style.color = { over: 'var(--amber-t)', under: 'var(--blue-t)', ok: 'var(--muted)', excl: 'var(--muted)' }[st];
+      row.append(dn);
+      box.append(row);
+    });
+  }
+
+  function renderLists(d) {
+    $('rb-q-meta').textContent = d.queue_count ? d.queue_count + ' items \u00b7 ' + fmtKiB(d.queue_kib) : '';
+    var q = $('rb-queue'); q.textContent = '';
+    if (!d.queue.length) q.append(el('div', 'empty', d.plan.count ? 'Nothing left in the plan.' : 'No plan yet.'));
+    d.queue.forEach(function (p) {
+      var it = el('div', 'item'), l = el('div'); l.style.minWidth = '0';
+      l.append(el('div', 't ellip', p.title), el('div', 'r', p.src + ' \u2192 ' + p.dst));
+      var sz = el('div', 'mono soft', fmtKiB(p.kib)); sz.style.cssText = 'font-size:13px;white-space:nowrap';
+      it.append(l, sz); q.append(it);
+    });
+
+    $('rb-h-meta').textContent = d.done.count || d.done.skipped ? d.done.count + ' done' + (d.done.skipped ? ' \u00b7 ' + d.done.skipped + ' skipped' : '') : '';
+    var h = $('rb-hist'); h.textContent = '';
+    if (!d.history.length) h.append(el('div', 'empty', 'Nothing yet.'));
+    d.history.forEach(function (x) {
+      var it = el('div', 'item'), l = el('div'); l.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:0';
+      var icon = x.result === 'done' ? svg('M3 8.5l3.2 3L13 4.5', '#5fd184') : x.result === 'skip' ? svg('M4 8h8', '#ffb85c') : svg('M4 4l8 8M12 4l-8 8', '#ff9b91');
+      var txt = el('div'); txt.style.minWidth = '0';
+      txt.append(el('div', 't ellip', x.title), el('div', 'r', x.src + ' \u2192 ' + x.dst + (x.result !== 'done' ? ' \u00b7 ' + x.reason : '')));
+      l.append(icon, txt);
+      var stat = x.result === 'done' ? fmtKiB(x.kib) + ' \u00b7 ' + fmtDur(x.secs) + (x.secs ? ' \u00b7 ' + fmtRate(x.kib * 1024 / x.secs) : '') : x.result === 'skip' ? 'skipped' : 'failed';
+      var s = el('div', 'mono soft', stat); s.style.cssText = 'font-size:12px;white-space:nowrap;text-align:right';
+      it.append(l, s); h.append(it);
+    });
+  }
+
+  function renderLog(d) {
+    var box = $('rb-log'); box.textContent = '';
+    if (!d.log.length) { box.append(el('div', 'muted', 'No log yet.')); return; }
+    d.log.forEach(function (line) {
+      var cls = /\bSKIP\b|PAUSED|WARNING/.test(line) ? 'skip' : /ERROR|ABORT/.test(line) ? 'err' : /\bMOVE\b/.test(line) ? 'mv' : '';
+      box.append(el('div', cls, line));
+    });
+  }
+
+  function loadForm(cfg) {
+    var f = $('rb-form');
+    Object.keys(cfg).forEach(function (k) {
+      var i = f.elements[k]; if (!i) return;
+      if (i.type === 'checkbox') i.checked = cfg[k] === 'true'; else i.value = cfg[k];
+    });
+    formLoaded = true;
+  }
+  $('rb-save').addEventListener('click', function () {
+    var f = $('rb-form'), data = {};
+    Array.prototype.forEach.call(f.elements, function (i) {
+      if (!i.name) return; data[i.name] = i.type === 'checkbox' ? (i.checked ? 'true' : 'false') : i.value;
+    });
+    $('rb-save-msg').textContent = 'Saving\u2026';
+    post('save', data).then(function (j) { $('rb-save-msg').textContent = j.msg; $('rb-save-msg').style.color = j.ok ? '' : 'var(--red-t)'; });
+  });
+
+  function render(d) {
+    last = d;
+    renderHead(d); renderChips(d); renderOverall(d); renderCurrent(d); renderDisks(d); renderLists(d); renderLog(d);
+    if (!formLoaded) loadForm(d.cfg);
+  }
+
+  function poll() {
+    if (document.hidden && last) return;
+    fetch(BASE + 'status.php', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () { setMsg('Could not reach the status endpoint - retrying', true); });
+  }
+  poll();
+  setInterval(function () { if (!busy) poll(); }, 3000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+})();
+</script>
