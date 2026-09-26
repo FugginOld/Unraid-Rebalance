@@ -85,7 +85,7 @@ Markdown="false"
 .rb .field{display:flex;flex-direction:column;gap:6px}
 .rb .field label{font-size:13px;color:var(--soft);font-weight:500}
 .rb .field .hint{font-size:12px;color:var(--muted)}
-.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--edge)!important;
+.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--grey)!important;
   background:var(--deep)!important;color:var(--text)!important;font:14px var(--mono)!important;width:100%!important;max-width:none!important}
 .rb .field.wide{grid-column:span 2}
 .rb .check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--soft);min-height:40px}
