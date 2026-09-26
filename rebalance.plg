@@ -3,8 +3,8 @@
 <!ENTITY name      "rebalance">
 <!ENTITY author    "FugginOld">
 <!ENTITY repo      "Unraid-Rebalance">
-<!ENTITY version   "2026.09.25">
-<!ENTITY md5       "54abd693c9a0ad2104c0403d382d9b3e">
+<!ENTITY version   "2026.09.26">
+<!ENTITY md5       "3ed716ae3638db4700e77c47514cd9d8">
 <!ENTITY launch    "Settings/Rebalance">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/main/&name;.plg">
 <!ENTITY pkg       "&name;-&version;-x86_64-1">
