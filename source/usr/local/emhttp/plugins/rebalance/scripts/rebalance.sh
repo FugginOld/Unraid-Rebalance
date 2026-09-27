@@ -23,6 +23,7 @@ NOTIFY_BIN=${RB_NOTIFY_BIN:-/usr/local/emhttp/webGui/scripts/notify}
 MDCMD=/usr/local/sbin/mdcmd
 BUSY_POLL_S=30   # parity/mover re-check while paused; RB_BUSY_POLL_S shortens it in tests only (RB_MNT is never set in production)
 [[ -n $RB_MNT && $RB_BUSY_POLL_S =~ ^[1-9][0-9]*$ ]] && BUSY_POLL_S=$RB_BUSY_POLL_S
+QUOTE_LC=$(locale -a 2>/dev/null | grep -m1 -ixE 'c\.utf-?8|en_us\.utf-?8')   # a UTF-8 locale this box has, so shown commands keep accented names readable; none = escaped
 MODE=$1
 
 ############################## CONFIG ##############################
@@ -262,7 +263,9 @@ progress_reader() {  # rsync --info=progress2 emits CR-separated updates
 }
 rsync_argv() {  # src dst rel -> RSYNC_ARGV: the one definition of the move command; RSYNC_LINE: the same argv, shell-quoted
   RSYNC_ARGV=(rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$MNT/$1/./$3" "$MNT/$2/")
-  LC_ALL=C.UTF-8 printf -v RSYNC_LINE '%q ' "${RSYNC_ARGV[@]}"; RSYNC_LINE=${RSYNC_LINE% }
+  if [[ -n $QUOTE_LC ]]; then LC_ALL=$QUOTE_LC printf -v RSYNC_LINE '%q ' "${RSYNC_ARGV[@]}"
+  else printf -v RSYNC_LINE '%q ' "${RSYNC_ARGV[@]}"; fi
+  RSYNC_LINE=${RSYNC_LINE% }
 }
 run_rsync() {  # src dst rel
   rsync_argv "$@"

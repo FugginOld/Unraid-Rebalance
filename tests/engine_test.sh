@@ -146,6 +146,11 @@ find "$T/mnt/disk1/movies/$NAME" -exec touch -h -d '2 hours ago' {} +
 bash "$ENGINE" plan; rc=$?
 ACC=$'\xc3\xa9'   # the raw UTF-8 bytes for e-acute
 check "readable non-ASCII names appear in the move script" '[[ $rc == 0 ]] && grep "^rsync " "$T/run/moves.sh" 2>/dev/null | grep -qF "$ACC"'
+mkdir -p "$T/noloc"   # a box whose locale -a lists no UTF-8 locale (Golem has no C.UTF-8): the engine must not set one
+printf '#!/bin/bash\nprintf "C\\nPOSIX\\n"\n' > "$T/noloc/locale"; chmod +x "$T/noloc/locale"
+PATH=$T/noloc:$PATH bash "$ENGINE" plan; rc=$?
+ESC='\303\251'   # e-acute as printf %q escapes it without a UTF-8 locale
+check "without a listed UTF-8 locale, names stay escaped" '[[ $rc == 0 ]] && grep "^rsync " "$T/run/moves.sh" 2>/dev/null | grep -qF "$ESC"'
 
 echo "== pause / resume / stop"
 make_fixture extra
