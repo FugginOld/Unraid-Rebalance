@@ -58,11 +58,13 @@ export PATH=$T/bin:$PATH
 
 echo "== plan (dry run)"
 make_fixture
+mkdir -p "$T/mnt/disk1/movies/Empty Folder" && touch -h -d '2 hours ago' "$T/mnt/disk1/movies/Empty Folder"   # #7: an empty folder at item depth on the over-full disk, aged like the rest of the fixture
 bash "$ENGINE" plan; rc=$?
 check "plan exits 0"                         '[[ $rc == 0 ]]'
 check "state is planned"                     '[[ $(st state) == planned ]]'
 check "one move planned"                     '[[ $(st plan_count) == 1 ]]'
 check "hardlinked items left out (2)"        '[[ $(st plan_skipped) == 2 ]]'
+check "empty folder is never planned"        '! grep -q "Empty Folder" "$T/run/plan.tsv"'
 check "tv never planned onto disk4 (share excluded)" '! grep -P "\tdisk4\ttv/" "$T/run/plan.tsv"'
 check "CRLF share config parsed (a plan exists)"     '[[ -s $T/run/plan.tsv ]]'
 check "nothing moved by a dry run"           '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" ]]'
@@ -83,6 +85,7 @@ check "state is done"                        '[[ $(st state) == done ]]'
 check "item arrived on disk4"                '[[ -f "$T/mnt/disk4/movies/Movie One (2020)/data.bin" ]]'
 check "item gone from disk1"                 '[[ ! -e "$T/mnt/disk1/movies/Movie One (2020)" ]]'
 check "run executes the pinned rsync command" '[[ $(cat "$T/rsync.argv" 2>/dev/null) == "$(printf "%s\n" rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$T/mnt/disk1/./movies/Movie One (2020)" "$T/mnt/disk4/")" ]]'
+check "empty folder stays on disk1 after the run" '[[ -d "$T/mnt/disk1/movies/Empty Folder" ]]'
 check "history records the move"             'grep -q "	done	" "$T/run/history.tsv"'
 check "pid file cleaned up"                  '[[ ! -f $T/run/pid ]]'
 json=$(php "$STATUS")
@@ -117,6 +120,12 @@ make_fixture
 echo 'EXCLUDE_SHARES="tv,movies,downloads"' >> "$T/rb.cfg"
 bash "$ENGINE" plan; rc=$?
 check "excluded-only dry run blames share exclusion" '[[ $rc == 0 && $(st plan_count) == 0 && $(st msg) == "Nothing can be moved - the over-full disk has no items in included shares" ]]'
+
+echo "== dry run with an over-full disk holding only empty folders and items that do not fit"
+make_fixture
+rm -rf "$T/mnt/disk1/movies" "$T/mnt/disk1/downloads"; mkdir -p "$T/mnt/disk1/tv/Empty Show (2019)"   # tv may not go to disk4, and both shows are too big for disk2 and disk3
+bash "$ENGINE" plan; rc=$?
+check "empty folders do not hide the nothing-can-be-moved warning" '[[ $rc == 0 && $(st plan_count) == 0 && $(st state) == done && $(st warn) == 1 && $(st msg) == "Nothing can be moved - no receiving disk or size limit fits"* ]]'
 
 echo "== pause / resume / stop"
 make_fixture extra

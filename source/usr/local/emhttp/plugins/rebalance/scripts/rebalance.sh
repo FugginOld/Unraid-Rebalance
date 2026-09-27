@@ -350,6 +350,7 @@ while :; do
     done
     [[ -z $recv ]] && continue
     DONE[$path]=1
+    [[ -n $(find "$path" -type f -size +0c -print -quit 2>/dev/null) ]] || continue   # no file with data (empty folder): moving it frees nothing (#7)
     why=""
     if ! item_static_ok "$path" why; then
       log "PLAN-SKIP $(human "$sz")  $path  ($why)"; (( plan_skipped++ )); continue
