@@ -56,6 +56,7 @@ Markdown="false"
 .rb .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .rb .stat .k{font-size:12px;color:var(--muted)} .rb .stat .v{font-family:var(--mono);font-size:18px}
 .rb .route{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;flex-wrap:wrap}
+.rb .cmd{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}
 .rb .dtag{padding:3px 10px;border-radius:6px;border:1px solid}
 .rb .dtag.from{border-color:var(--amber);color:var(--amber-t)} .rb .dtag.to{border-color:var(--blue);color:var(--blue-t)}
 .rb .cur-title{font-family:var(--cond);font-size:28px;font-weight:600;line-height:1.15;word-break:break-word}
@@ -350,6 +351,7 @@ Markdown="false"
     box.append(el('div', 'cur-title', c.title));
     var r = el('div', 'route'); r.append(el('span', 'dtag from', c.src), svg('M1 8h13M10 4l4 4-4 4', 'var(--muted)'), el('span', 'dtag to', c.dst), el('span', 'muted', c.share + ' share'));
     box.append(r);
+    if (c.cmd) box.append(el('div', 'cmd', c.cmd));   // exact rsync command, text only
     var bar = el('div', 'bar'); var f = el('div'); f.style.width = (c.pct || 0) + '%'; bar.append(f); box.append(bar);
     var left = c.rate ? ' \u00b7 ' + fmtDur(Math.max(0, c.kib * 1024 - c.bytes) / c.rate) + ' left' : '';
     var sp = el('div', 'spread'); sp.append(el('span', null, fmtKiB(c.bytes / 1024) + ' of ' + fmtKiB(c.kib)), el('span', 'soft', fmtRate(c.rate) + left));

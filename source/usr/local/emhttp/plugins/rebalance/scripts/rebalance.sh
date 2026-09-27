@@ -260,11 +260,13 @@ progress_reader() {  # rsync --info=progress2 emits CR-separated updates
       "${BASH_REMATCH[4]}" "$EPOCHSECONDS" > "$RUN/progress.tmp" && mv -f "$RUN/progress.tmp" "$RUN/progress"
   done
 }
-rsync_argv() {  # src dst rel -> RSYNC_ARGV: the one definition of the move command
+rsync_argv() {  # src dst rel -> RSYNC_ARGV: the one definition of the move command; RSYNC_LINE: the same argv, shell-quoted
   RSYNC_ARGV=(rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$MNT/$1/./$3" "$MNT/$2/")
+  printf -v RSYNC_LINE '%q ' "${RSYNC_ARGV[@]}"; RSYNC_LINE=${RSYNC_LINE% }
 }
 run_rsync() {  # src dst rel
   rsync_argv "$@"
+  st_set cur_cmd "$RSYNC_LINE"   # the dashboard shows the argv that runs on the next line
   "${RSYNC_ARGV[@]}" </dev/null | progress_reader
   return "${PIPESTATUS[0]}"
 }
@@ -396,7 +398,7 @@ done_count=0; done_kib=0; skipped=0; turbo_tried=0
 while IFS=$'\t' read -r idx sz src dst rel; do
   check_control || break
   wait_until_clear || break
-  st_set cur_idx "$idx" cur_started "$EPOCHSECONDS"
+  st_set cur_idx "$idx" cur_started "$EPOCHSECONDS" cur_cmd ""
   t0=$EPOCHSECONDS; reason=""
   if   [[ ! -e $MNT/$src/$rel ]]; then reason="source no longer exists"
   elif [[ -e $MNT/$dst/$rel ]];   then reason="already exists on $dst"

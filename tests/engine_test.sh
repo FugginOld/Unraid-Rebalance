@@ -134,6 +134,7 @@ REAL_RSYNC=$(command -v rsync)
 cat > "$T/slow/rsync" <<EOF
 #!/bin/bash
 # emits rsync --info=progress2 style updates, then does the real copy
+printf '%s\n' "\${0##*/}" "\$@" > "$T/slow.argv"
 for p in 10 40 70; do printf '      1,234,567  %s%%    2.50MB/s    0:00:03\\r' \$p; sleep 1; done
 exec "$REAL_RSYNC" "\$@"
 EOF
@@ -188,6 +189,21 @@ for _ in $(seq 20); do [[ $(st state) == paused ]] && break; sleep 0.5; done
 np=$(st done_count); ctl resume
 for _ in $(seq 40); do [[ $(st state) == running || $(st state) == paused ]] || break; sleep 0.5; done
 check "a stop sent right after resume is kept" '[[ $(st state) == stopped ]] && (( $(st done_count) - np <= 1 ))'
+pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
+
+echo "== the current move shows its rsync command"
+make_fixture extra
+rm -f "$T/slow.argv"
+PATH=$T/slow:$PATH setsid bash "$ENGINE" run & started
+shown=""; want=""; shown_argv=()
+for _ in $(seq 40); do   # until rsync runs and the dashboard shows a command; between two moves they can differ for an instant
+  shown=$(php "$STATUS" | python3 -c 'import json,sys; c=json.load(sys.stdin)["current"]; print(c.get("cmd", "") if c else "")' 2>/dev/null)
+  shown_argv=(); eval "shown_argv=($shown)" 2>/dev/null
+  want=$(cat "$T/slow.argv" 2>/dev/null)
+  [[ -n $shown && -n $want && $(printf '%s\n' "${shown_argv[@]}") == "$want" ]] && break
+  sleep 0.25
+done
+check "Now moving shows the rsync command that is running" '[[ -n $shown && -n $want && $(printf "%s\n" "${shown_argv[@]}") == "$want" ]]'
 pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
 
 echo "== abort"
