@@ -245,7 +245,7 @@ build_candidates() {  # disk -> "sizeKiB<TAB>path" NUL records, largest first
     [[ -d $dir ]] || continue
     share=${dir%/}; share=${share##*/}
     share_eligible "$share" || continue
-    find "$MNT/$d/$share" -mindepth "$ITEM_DEPTH" -maxdepth "$ITEM_DEPTH" ! -name '.*' ! -name $'*\n*' ! -name $'*\t*' -print0 \
+    find "$MNT/$d/$share" -mindepth "$ITEM_DEPTH" -maxdepth "$ITEM_DEPTH" ! -name '.*' ! -path $'*\n*' ! -path $'*\t*' -print0 \
       | xargs -0 -r du -sk --null -- 2>/dev/null
   done | sort -z -t$'\t' -k1,1nr > "$RUN/cand.$d"
 }

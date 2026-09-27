@@ -155,6 +155,13 @@ sed 's/^TOLERANCE_PCT=.*/TOLERANCE_PCT="99"/' "$T/rb.cfg" > "$T/bal.cfg"   # eve
 RB_CFG=$T/bal.cfg bash "$ENGINE" plan; rc=$?
 check "a new run clears the previous move script" '[[ $rc == 0 && $(st plan_count) == 0 && ! -e $T/run/moves.sh ]]'
 
+echo "== a newline in a parent folder at item depth 2"
+make_fixture
+mv "$T/mnt/disk1/movies/Movie One (2020)" "$T/mnt/disk1/movies/Movie"$'\n'"One"   # the item that would be planned now sits under a split name
+echo 'ITEM_DEPTH="2"' >> "$T/rb.cfg"
+bash "$ENGINE" plan; rc=$?
+check "plan.tsv records stay whole when a parent folder name has a newline" '[[ $rc == 0 && -e $T/run/plan.tsv ]] && ! awk -F"\t" "NF != 5 { bad=1 } END { exit !bad }" "$T/run/plan.tsv"'
+
 echo "== pause / resume / stop"
 make_fixture extra
 mkdir -p "$T/slow"
