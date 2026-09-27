@@ -260,9 +260,12 @@ progress_reader() {  # rsync --info=progress2 emits CR-separated updates
       "${BASH_REMATCH[4]}" "$EPOCHSECONDS" > "$RUN/progress.tmp" && mv -f "$RUN/progress.tmp" "$RUN/progress"
   done
 }
+rsync_argv() {  # src dst rel -> RSYNC_ARGV: the one definition of the move command
+  RSYNC_ARGV=(rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$MNT/$1/./$3" "$MNT/$2/")
+}
 run_rsync() {  # src dst rel
-  rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive \
-    "$MNT/$1/./$3" "$MNT/$2/" </dev/null | progress_reader
+  rsync_argv "$@"
+  "${RSYNC_ARGV[@]}" </dev/null | progress_reader
   return "${PIPESTATUS[0]}"
 }
 history() {  # idx result reason kib src dst start end rel
