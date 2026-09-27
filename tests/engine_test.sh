@@ -17,6 +17,7 @@ pass() { printf '  ok    %s\n' "$1"; }
 fail() { printf '  FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
 check() { if eval "$2"; then pass "$1"; else fail "$1"; fi; }
 st() { sed -n "s/^$1=//p" "$T/run/status" 2>/dev/null; }
+started() { for _ in $(seq 40); do [[ -n $(st state) ]] && return; sleep 0.25; done; }   # status is written after the engine clears the control file
 
 make_fixture() {
   rm -rf "$T/mnt" "$T/run" "$T/sizes" "$T/cfg" "$T/bin" "$T/notify.log"
@@ -162,7 +163,7 @@ fi
 exit \$rc
 EOF
 chmod +x "$T/race/cat"
-PATH=$T/race:$T/slow:$PATH setsid bash "$ENGINE" run & sleep 2.5
+PATH=$T/race:$T/slow:$PATH setsid bash "$ENGINE" run & started
 ctl pause
 for _ in $(seq 20); do [[ $(st state) == paused ]] && break; sleep 0.5; done
 np=$(st done_count); ctl resume
