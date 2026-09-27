@@ -83,6 +83,9 @@ Markdown="false"
 .rb .loglines{font-family:var(--mono);font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;gap:4px;overflow-x:auto}
 .rb .loglines div{white-space:pre}
 .rb .loglines .skip{color:var(--amber-t)} .rb .loglines .err{color:var(--red-t)} .rb .loglines .mv{color:var(--text)}
+.rb [hidden]{display:none!important}
+.rb a.pill{text-decoration:none} .rb a.pill:hover{color:var(--text)}
+.rb #rb-moves{scroll-margin-top:80px} .rb #rb-moves .loglines{max-height:420px;overflow-y:auto}
 .rb a{color:var(--amber)} .rb a:hover{color:var(--amber-t)}
 .rb details{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0 24px}
 .rb summary{cursor:pointer;padding:18px 0;font-family:var(--cond);font-size:20px;font-weight:600;list-style-position:inside}
@@ -110,7 +113,7 @@ Markdown="false"
   <div class="head">
     <div>
       <div class="eyebrow"><?=htmlspecialchars(strtoupper($var['NAME'] ?? 'UNRAID'))?> · UNRAID ARRAY</div>
-      <div class="title-row"><h1>Array Rebalance</h1><span class="pill" id="rb-pill"><i></i><span>Loading</span></span></div>
+      <div class="title-row"><h1>Array Rebalance</h1><span class="pill" id="rb-pill"><i></i><span>Loading</span></span><a class="pill" id="rb-moves-pill" href="#rb-moves" hidden>View move script</a></div>
       <div class="muted" id="rb-meta">&nbsp;</div>
     </div>
     <div class="actions" id="rb-actions"></div>
@@ -176,6 +179,11 @@ Markdown="false"
     <div class="loglines" id="rb-log"></div>
   </section>
 
+  <section class="logbox" id="rb-moves" hidden>
+    <h2 class="label">Move script</h2>
+    <div class="loglines" id="rb-moves-text"></div>
+  </section>
+
   <details id="rb-settings">
     <summary>Settings</summary>
     <form class="form" id="rb-form" onsubmit="return false">
@@ -207,6 +215,7 @@ Markdown="false"
 (function () {
   var CSRF = "<?=$var['csrf_token']?>";
   var BASE = '/plugins/rebalance/include/';
+  var movesKey = null;   // started time of the dry run whose script is shown
   var KI = 1024, GI = 1024 * 1024, TI = GI * 1024;
   var $ = function (id) { return document.getElementById(id); };
   var formLoaded = false, busy = false, last = null;
@@ -426,7 +435,14 @@ Markdown="false"
   }
 
   function renderLog(d) {
-    $('rb-script').hidden = !(d.plan.count > 0 && d.state === 'planned');
+    var ready = d.plan.count > 0 && d.state === 'planned';
+    $('rb-script').hidden = $('rb-moves-pill').hidden = $('rb-moves').hidden = !ready;
+    if (ready && movesKey !== d.started) {   // fetch the script once per dry run, not on every poll
+      movesKey = d.started;
+      fetch(BASE + 'script.php', { cache: 'no-store' }).then(function (r) { return r.text(); })
+        .then(function (t) { var m = $('rb-moves-text'); m.textContent = ''; m.append(el('div', '', t)); })
+        .catch(function () { movesKey = null; });
+    }
     var box = $('rb-log'); box.textContent = '';
     if (!d.log.length) { box.append(el('div', 'muted', 'No log yet.')); return; }
     d.log.forEach(function (line) {
