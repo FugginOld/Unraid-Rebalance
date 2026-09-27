@@ -68,11 +68,21 @@ check "CRLF share config parsed (a plan exists)"     '[[ -s $T/run/plan.tsv ]]'
 check "nothing moved by a dry run"           '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" ]]'
 
 echo "== run"
-bash "$ENGINE" run; rc=$?
+REAL_RSYNC=$(command -v rsync)
+mkdir -p "$T/argv"; rm -f "$T/rsync.argv"
+cat > "$T/argv/rsync" <<EOF
+#!/bin/bash
+# records the argv the engine ran rsync with, one per line, then does the real copy
+printf '%s\n' "\${0##*/}" "\$@" >> "$T/rsync.argv"
+exec "$REAL_RSYNC" "\$@"
+EOF
+chmod +x "$T/argv/rsync"
+PATH=$T/argv:$PATH bash "$ENGINE" run; rc=$?
 check "run exits 0"                          '[[ $rc == 0 ]]'
 check "state is done"                        '[[ $(st state) == done ]]'
 check "item arrived on disk4"                '[[ -f "$T/mnt/disk4/movies/Movie One (2020)/data.bin" ]]'
 check "item gone from disk1"                 '[[ ! -e "$T/mnt/disk1/movies/Movie One (2020)" ]]'
+check "run executes the pinned rsync command" '[[ $(cat "$T/rsync.argv" 2>/dev/null) == "$(printf "%s\n" rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$T/mnt/disk1/./movies/Movie One (2020)" "$T/mnt/disk4/")" ]]'
 check "history records the move"             'grep -q "	done	" "$T/run/history.tsv"'
 check "pid file cleaned up"                  '[[ ! -f $T/run/pid ]]'
 json=$(php "$STATUS")
