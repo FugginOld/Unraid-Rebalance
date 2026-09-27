@@ -19,7 +19,7 @@ LOG=${RB_LOG:-/var/log/$PLUGIN.log}
 MNT=${RB_MNT:-/mnt}
 VAR_INI=${RB_VAR_INI:-/var/local/emhttp/var.ini}
 SHARE_CFG_DIR=${RB_SHARE_CFG:-/boot/config}
-NOTIFY_BIN=/usr/local/emhttp/webGui/scripts/notify
+NOTIFY_BIN=${RB_NOTIFY_BIN:-/usr/local/emhttp/webGui/scripts/notify}
 MDCMD=/usr/local/sbin/mdcmd
 BUSY_POLL_S=30   # parity/mover re-check while paused; RB_BUSY_POLL_S shortens it in tests only (RB_MNT is never set in production)
 [[ -n $RB_MNT && $RB_BUSY_POLL_S =~ ^[1-9][0-9]*$ ]] && BUSY_POLL_S=$RB_BUSY_POLL_S
@@ -315,7 +315,7 @@ st_set target_ppm "$ratio_ppm"
 report "BEFORE"
 
 # ---------- PLAN (simulated greedy, largest items first) ----------
-declare -A EXHAUSTED DONE PLANNED_AT
+declare -A EXHAUSTED DONE PLANNED_AT NOCAND
 plan_count=0; plan_kib=0; plan_skipped=0
 : > "$RUN/plan.tsv"
 while :; do
@@ -327,6 +327,7 @@ while :; do
   done
   [[ -z $donor ]] && break
   [[ -f $RUN/cand.$donor ]] || { log "Scanning $donor (depth $ITEM_DEPTH)"; build_candidates "$donor"; }
+  [[ -s $RUN/cand.$donor ]] || NOCAND[$donor]=1   # nothing in included shares at ITEM_DEPTH
 
   picked=0
   while IFS=$'\t' read -r -d '' sz path; do
@@ -371,9 +372,12 @@ log "Plan: $summary"
 
 if (( plan_count == 0 )); then   # EXHAUSTED = a disk was over tolerance but had nothing eligible
   if (( ${#EXHAUSTED[@]} && plan_skipped )); then msg="Nothing can be moved - $plan_skipped item(s) left out (in-progress or hardlinked), see log"
+  elif (( ${#EXHAUSTED[@]} && ${#NOCAND[@]} == ${#EXHAUSTED[@]} )); then msg="Nothing can be moved - the over-full disk has no items in included shares"
   elif (( ${#EXHAUSTED[@]} )); then msg="Nothing can be moved - no receiving disk or size limit fits the over-full disk's items"
   else msg="Nothing to move - array is already balanced"; fi
-  FINAL=done; st_set state done msg "$msg"; notify normal "$msg"
+  FINAL=done
+  if (( ${#EXHAUSTED[@]} )); then st_set state done warn 1 msg "$msg"; notify warning "$msg"
+  else st_set state done msg "$msg"; notify normal "$msg"; fi
   exit 0
 fi
 if [[ $MODE == plan ]]; then

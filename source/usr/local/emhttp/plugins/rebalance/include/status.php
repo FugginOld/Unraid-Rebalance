@@ -163,6 +163,7 @@ echo json_encode([
   'state'      => $state,
   'mode'       => $st['mode'] ?? null,
   'msg'        => $st['msg'] ?? '',
+  'warn'       => ($st['warn'] ?? '') === '1',
   'pause_reason' => $st['pause_reason'] ?? '',
   'paused_s'   => (int)($st['paused_s'] ?? 0) + ($state === 'paused' && !empty($st['paused_since']) ? max(0, time() - (int)$st['paused_since']) : 0),
   'request'    => $alive && in_array($req = trim((string)@file_get_contents("$run/control")), ['pause', 'stop'], true) ? $req : '',

@@ -42,7 +42,7 @@ Markdown="false"
 .rb .field input[type=text]:focus,.rb .field input[type=number]:focus{border-color:var(--amber)!important;box-shadow:0 0 0 1px var(--amber);outline:2px solid transparent!important}
 @media (prefers-reduced-motion:reduce){.rb *{transition:none!important}}
 .rb .msg{padding:12px 16px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--soft)}
-.rb .msg.bad{border-color:var(--red);color:var(--red-t)} .rb .msg:empty{display:none}
+.rb .msg.bad{border-color:var(--red);color:var(--red-t)} .rb .msg.warn{border-color:var(--amber);color:var(--amber-t)} .rb .msg:empty{display:none}
 .rb .chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .rb .chip{display:flex;flex-direction:column;gap:3px;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .rb .chip .k{font-size:12px;color:var(--muted)} .rb .chip .v{font-size:15px;font-weight:600} .rb .chip .s{font-size:12px;color:var(--muted);font-family:var(--mono)}
@@ -249,7 +249,7 @@ Markdown="false"
       stop: 'Stop after the current move finishes?'
     }[action];
     if (ask && !confirm(ask)) return;
-    post(action).then(function (j) { if (!j.ok) setMsg(j.msg, true); });
+    post(action).then(function (j) { if (!j.ok) setMsg(j.msg, 'bad'); });
   }
 
   function button(label, action, cls) {
@@ -257,15 +257,16 @@ Markdown="false"
     b.addEventListener('click', function () { act(action); }); return b;
   }
 
-  function setMsg(text, bad) { var m = $('rb-msg'); m.textContent = text || ''; m.className = 'msg' + (bad ? ' bad' : ''); }
+  function setMsg(text, cls) { var m = $('rb-msg'); m.textContent = text || ''; m.className = 'msg' + (cls ? ' ' + cls : ''); }
 
   function renderHead(d) {
     var s = STATES[d.state] || [d.state, ''];
+    var warn = d.state === 'done' && d.warn;   // "Nothing can be moved": done, but a disk is still over target
     var label = s[0];
     if (d.state === 'paused' && d.pause_reason && d.pause_reason !== 'user') label = 'Paused \u00b7 ' + d.pause_reason;
     var pending = d.request === 'stop' || (d.request === 'pause' && d.state === 'running') ? d.request : '';
     if (pending) label += ' \u00b7 ' + (pending === 'pause' ? 'pausing' : 'stopping') + (d.state === 'running' ? ' after this move' : '');
-    var pill = $('rb-pill'); pill.className = 'pill ' + s[1]; pill.lastChild.textContent = label;
+    var pill = $('rb-pill'); pill.className = 'pill ' + (warn ? 'warn' : s[1]); pill.lastChild.textContent = label;
 
     var meta = [];
     var active = ['planning', 'running', 'paused'].indexOf(d.state) >= 0;
@@ -292,8 +293,8 @@ Markdown="false"
     } else {
       a.append(button('Dry run', 'plan'), button('Start rebalance', 'run', 'primary'));
     }
-    if (d.state === 'error' || d.state === 'stale') setMsg(d.msg || 'The engine stopped unexpectedly - check the log.', true);
-    else setMsg(d.msg || '', false);
+    if (d.state === 'error' || d.state === 'stale') setMsg(d.msg || 'The engine stopped unexpectedly - check the log.', 'bad');
+    else setMsg(d.msg || '', warn ? 'warn' : '');
   }
 
   function chip(k, v, s) {
@@ -319,7 +320,7 @@ Markdown="false"
     if (!d.plan.count) {
       $('rb-pct').textContent = '-';
       $('rb-pct-sub').textContent = d.state === 'planning' ? 'Building the plan\u2026'
-        : d.state === 'done' ? 'Nothing to move' : 'Run a dry run to see what would move';
+        : d.state === 'done' ? (d.warn ? 'Nothing can be moved' : 'Nothing to move') : 'Run a dry run to see what would move';
     } else if (d.state === 'planned') {
       $('rb-pct').textContent = fmtKiB(total);
       $('rb-pct-sub').textContent = 'planned across ' + d.plan.count + ' moves (dry run)';
@@ -459,7 +460,7 @@ Markdown="false"
     fetch(BASE + 'status.php', { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(render)
-      .catch(function () { setMsg('Could not reach the status endpoint - retrying', true); });
+      .catch(function () { setMsg('Could not reach the status endpoint - retrying', 'bad'); });
   }
   poll();
   setInterval(function () { if (!busy) poll(); }, 3000);

@@ -19,7 +19,7 @@ check() { if eval "$2"; then pass "$1"; else fail "$1"; fi; }
 st() { sed -n "s/^$1=//p" "$T/run/status" 2>/dev/null; }
 
 make_fixture() {
-  rm -rf "$T/mnt" "$T/run" "$T/sizes" "$T/cfg" "$T/bin"
+  rm -rf "$T/mnt" "$T/run" "$T/sizes" "$T/cfg" "$T/bin" "$T/notify.log"
   mkdir -p "$T/bin" "$T/sizes" "$T/run" "$T/cfg/shares"
   cat > "$T/bin/df" <<EOF
 #!/bin/bash
@@ -33,6 +33,7 @@ for p in "\${paths[@]}"; do
 done
 EOF
   chmod +x "$T/bin/df"
+  printf '#!/bin/bash\necho "$*" >> "%s/notify.log"\n' "$T" > "$T/bin/notify"; chmod +x "$T/bin/notify"   # records each notify call: ... -i <level>
   local M=$T/mnt
   mk() { mkdir -p "$M/$1/$2"; dd if=/dev/urandom of="$M/$1/$2/data.bin" bs=4k count=$(( $3 / 4 )) status=none; }
   echo 2000 > "$T/sizes/disk1"; echo 2000 > "$T/sizes/disk2"; echo 4000 > "$T/sizes/disk3"; echo 4000 > "$T/sizes/disk4"
@@ -51,7 +52,7 @@ EOF
   printf 'TOLERANCE_PCT="5"\nMIN_FREE_GB="0"\nSKIP_RECENT_MIN="15"\nNOTIFY="false"\r\n' > "$T/rb.cfg"
 }
 
-export RB_MNT=$T/mnt RB_RUN=$T/run RB_LOG=$T/rb.log RB_VAR_INI=$T/var.ini RB_SHARE_CFG=$T/cfg RB_CFG=$T/rb.cfg
+export RB_MNT=$T/mnt RB_RUN=$T/run RB_LOG=$T/rb.log RB_VAR_INI=$T/var.ini RB_SHARE_CFG=$T/cfg RB_CFG=$T/rb.cfg RB_NOTIFY_BIN=$T/bin/notify
 export PATH=$T/bin:$PATH
 
 echo "== plan (dry run)"
@@ -82,19 +83,29 @@ make_fixture; rm -rf "$T"/mnt/disk*/*               # empty disks: nothing is ov
 bash "$ENGINE" plan; rc=$?
 check "balanced dry run exits 0"             '[[ $rc == 0 && $(st plan_count) == 0 ]]'
 check "balanced dry run says nothing to move" '[[ $(st state) == done && $(st msg) == *"already balanced"* ]]'
+check "balanced result is not a warning"     'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"warn\"] is False"'
 
 echo "== dry run with an over-full disk but nothing eligible"
 make_fixture
+sed -i 's/NOTIFY="false"/NOTIFY="true"/' "$T/rb.cfg"
 for d in "$T"/mnt/disk1/*/*/; do touch "$d/x.part"; done    # every item on the donor looks in-progress
 bash "$ENGINE" plan; rc=$?
 check "stuck dry run plans nothing"          '[[ $rc == 0 && $(st plan_count) == 0 && $(st plan_skipped) -ge 1 ]]'
 check "stuck dry run says how many items were left out" '[[ $(st state) == done && $(st msg) == "Nothing can be moved - $(st plan_skipped) item(s) left out"* ]]'
+check "stuck dry run sends a warning notification" 'grep -q -- "-i warning" "$T/notify.log"'
+check "status.php flags the stuck result as a warning" 'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"warn\"] is True"'
 
 echo "== dry run with an over-full disk but no receiving disk with room"
 make_fixture
 sed -i 's/MIN_FREE_GB="0"/MIN_FREE_GB="1"/' "$T/rb.cfg"      # 1 GiB free-space floor: no fake disk can receive anything
 bash "$ENGINE" plan; rc=$?
 check "size-limited dry run explains the limit" '[[ $rc == 0 && $(st plan_count) == 0 && $(st plan_skipped) == 0 && $(st state) == done && $(st msg) == "Nothing can be moved - no receiving disk or size limit fits"* ]]'
+
+echo "== dry run with an over-full disk whose items are all in excluded shares"
+make_fixture
+echo 'EXCLUDE_SHARES="tv,movies,downloads"' >> "$T/rb.cfg"
+bash "$ENGINE" plan; rc=$?
+check "excluded-only dry run blames share exclusion" '[[ $rc == 0 && $(st plan_count) == 0 && $(st msg) == "Nothing can be moved - the over-full disk has no items in included shares" ]]'
 
 echo "== pause / resume / stop"
 make_fixture extra
