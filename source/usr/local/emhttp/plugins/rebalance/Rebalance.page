@@ -439,7 +439,7 @@ Markdown="false"
     $('rb-script').hidden = $('rb-moves-pill').hidden = $('rb-moves').hidden = !ready;
     if (ready && movesKey !== d.started) {   // fetch the script once per dry run, not on every poll
       movesKey = d.started;
-      fetch(BASE + 'script.php', { cache: 'no-store' }).then(function (r) { return r.text(); })
+      fetch(BASE + 'script.php', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw r.status; return r.text(); })
         .then(function (t) { var m = $('rb-moves-text'); m.textContent = ''; m.append(el('div', '', t)); })
         .catch(function () { movesKey = null; });
     }

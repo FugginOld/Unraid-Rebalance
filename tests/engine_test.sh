@@ -151,6 +151,9 @@ printf '#!/bin/bash\nprintf "C\\nPOSIX\\n"\n' > "$T/noloc/locale"; chmod +x "$T/
 PATH=$T/noloc:$PATH bash "$ENGINE" plan; rc=$?
 ESC='\303\251'   # e-acute as printf %q escapes it without a UTF-8 locale
 check "without a listed UTF-8 locale, names stay escaped" '[[ $rc == 0 ]] && grep "^rsync " "$T/run/moves.sh" 2>/dev/null | grep -qF "$ESC"'
+sed 's/^TOLERANCE_PCT=.*/TOLERANCE_PCT="99"/' "$T/rb.cfg" > "$T/bal.cfg"   # every disk within tolerance: nothing to plan
+RB_CFG=$T/bal.cfg bash "$ENGINE" plan; rc=$?
+check "a new run clears the previous move script" '[[ $rc == 0 && $(st plan_count) == 0 && ! -e $T/run/moves.sh ]]'
 
 echo "== pause / resume / stop"
 make_fixture extra
