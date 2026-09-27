@@ -172,7 +172,7 @@ Markdown="false"
   </div>
 
   <section class="logbox">
-    <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="label">Log</h2><a href="/plugins/rebalance/include/log.php">Download full log</a></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="label">Log</h2><span style="display:flex;gap:16px;flex-wrap:wrap"><a id="rb-script" href="/plugins/rebalance/include/script.php" target="_blank" rel="noopener" hidden>View move script</a><a href="/plugins/rebalance/include/log.php">Download full log</a></span></div>
     <div class="loglines" id="rb-log"></div>
   </section>
 
@@ -426,6 +426,7 @@ Markdown="false"
   }
 
   function renderLog(d) {
+    $('rb-script').hidden = !(d.plan.count > 0 && d.state === 'planned');
     var box = $('rb-log'); box.textContent = '';
     if (!d.log.length) { box.append(el('div', 'muted', 'No log yet.')); return; }
     d.log.forEach(function (line) {

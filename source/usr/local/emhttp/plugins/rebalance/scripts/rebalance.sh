@@ -262,7 +262,7 @@ progress_reader() {  # rsync --info=progress2 emits CR-separated updates
 }
 rsync_argv() {  # src dst rel -> RSYNC_ARGV: the one definition of the move command; RSYNC_LINE: the same argv, shell-quoted
   RSYNC_ARGV=(rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$MNT/$1/./$3" "$MNT/$2/")
-  printf -v RSYNC_LINE '%q ' "${RSYNC_ARGV[@]}"; RSYNC_LINE=${RSYNC_LINE% }
+  LC_ALL=C.UTF-8 printf -v RSYNC_LINE '%q ' "${RSYNC_ARGV[@]}"; RSYNC_LINE=${RSYNC_LINE% }
 }
 run_rsync() {  # src dst rel
   rsync_argv "$@"
@@ -272,6 +272,22 @@ run_rsync() {  # src dst rel
 }
 history() {  # idx result reason kib src dst start end rel
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$@" >> "$RUN/history.tsv"
+}
+write_move_script() {  # plan.tsv -> moves.sh: the dry run's moves as the exact commands, to read; nothing runs it
+  local idx sz src dst rel
+  { printf '%s\n' '#!/bin/bash' \
+      '# Array Rebalance - move plan from a dry run, for review only.' \
+      '# Start rebalance in the dashboard rebuilds the plan from current disk usage,' \
+      '# so the real run may differ from this list.' \
+      '# Running these commands yourself bypasses the engine safety checks: open-file and' \
+      '# hardlink skips, the parity and mover pause, collision checks, per-move' \
+      '# verification and empty-folder cleanup.' \
+      'echo "Review only - start the rebalance from the dashboard"; exit 1'
+    while IFS=$'\t' read -r idx sz src dst rel; do
+      rsync_argv "$src" "$dst" "$rel"
+      printf '\n# %s  %s  %s -> %s\n%s\n' "$idx" "$(human "$sz")" "$MNT/$src/$rel" "$MNT/$dst/" "$RSYNC_LINE"
+    done < "$RUN/plan.tsv"
+  } > "$RUN/moves.sh"
 }
 
 ############################## MAIN ##############################
@@ -284,7 +300,7 @@ flock -n 9 || { echo "a rebalance is already running" >&2; exit 1; }
 [[ -f $LOG ]] && mv -f "$LOG" "$LOG.1"
 exec >>"$LOG" 2>&1
 echo $$ > "$RUN/pid"
-rm -f "$RUN"/{control,progress,plan.tsv,history.tsv,start.tsv,reads.prev} "$RUN"/cand.*
+rm -f "$RUN"/{control,progress,plan.tsv,history.tsv,start.tsv,reads.prev,moves.sh} "$RUN"/cand.*
 load_cfg
 
 on_exit() {
@@ -387,6 +403,7 @@ if (( plan_count == 0 )); then   # EXHAUSTED = a disk was over tolerance but had
   exit 0
 fi
 if [[ $MODE == plan ]]; then
+  write_move_script
   FINAL=planned; st_set state planned msg "$summary"
   notify normal "Dry run: $summary"
   exit 0

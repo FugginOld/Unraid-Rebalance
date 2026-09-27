@@ -9,6 +9,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 PLUG=$REPO/source/usr/local/emhttp/plugins/rebalance
 ENGINE=$PLUG/scripts/rebalance.sh
 STATUS=$PLUG/include/status.php
+SCRIPT=$PLUG/include/script.php
 T=$(mktemp -d)
 trap 'pkill -f "$T" 2>/dev/null; rm -rf "$T"' EXIT
 FAILS=0
@@ -68,6 +69,12 @@ check "empty folder is never planned"        '! grep -q "Empty Folder" "$T/run/p
 check "tv never planned onto disk4 (share excluded)" '! grep -P "\tdisk4\ttv/" "$T/run/plan.tsv"'
 check "CRLF share config parsed (a plan exists)"     '[[ -s $T/run/plan.tsv ]]'
 check "nothing moved by a dry run"           '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" ]]'
+cp "$T/run/moves.sh" "$T/dry-moves.sh" 2>/dev/null
+guard=$(PATH=/nonexistent /bin/bash "$T/run/moves.sh" 2>&1); grc=$?   # no rsync on PATH: a missing guard still moves nothing
+check "dry run writes a move script"         '[[ -s $T/run/moves.sh ]]'
+check "move script stops at its review-only guard" '[[ $grc == 1 && $guard == "Review only - start the rebalance from the dashboard" ]]'
+check "move script has one rsync line per planned move" '[[ $(grep -c "^rsync " "$T/run/moves.sh" 2>/dev/null) == "$(st plan_count)" ]]'
+check "script.php serves the move script"    '[[ -s $T/run/moves.sh && $(php "$SCRIPT" 2>/dev/null) == "$(cat "$T/run/moves.sh")" ]]'
 
 echo "== run"
 REAL_RSYNC=$(command -v rsync)
@@ -86,6 +93,8 @@ check "item arrived on disk4"                '[[ -f "$T/mnt/disk4/movies/Movie O
 check "item gone from disk1"                 '[[ ! -e "$T/mnt/disk1/movies/Movie One (2020)" ]]'
 check "run executes the pinned rsync command" '[[ $(cat "$T/rsync.argv" 2>/dev/null) == "$(printf "%s\n" rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$T/mnt/disk1/./movies/Movie One (2020)" "$T/mnt/disk4/")" ]]'
 check "empty folder stays on disk1 after the run" '[[ -d "$T/mnt/disk1/movies/Empty Folder" ]]'
+while IFS= read -r l; do a=(); eval "a=($l)" 2>/dev/null; printf '%s\n' "${a[@]}"; done < <(grep '^rsync ' "$T/dry-moves.sh" 2>/dev/null) > "$T/script.argv"
+check "move script commands are the commands the run executed" '[[ -s $T/script.argv ]] && cmp -s "$T/script.argv" "$T/rsync.argv"'
 check "history records the move"             'grep -q "	done	" "$T/run/history.tsv"'
 check "pid file cleaned up"                  '[[ ! -f $T/run/pid ]]'
 json=$(php "$STATUS")
@@ -126,6 +135,17 @@ make_fixture
 rm -rf "$T/mnt/disk1/movies" "$T/mnt/disk1/downloads"; mkdir -p "$T/mnt/disk1/tv/Empty Show (2019)"   # tv may not go to disk4, and both shows are too big for disk2 and disk3
 bash "$ENGINE" plan; rc=$?
 check "empty folders do not hide the nothing-can-be-moved warning" '[[ $rc == 0 && $(st plan_count) == 0 && $(st state) == done && $(st warn) == 1 && $(st msg) == "Nothing can be moved - no receiving disk or size limit fits"* ]]'
+
+echo "== a non-ASCII item name in the move script"
+make_fixture
+printf -v NAME 'Caf\xc3\xa9 (2019)'   # readable accented name, built from raw UTF-8 bytes
+rm -rf "$T/mnt/disk1/movies/Movie One (2020)"
+mkdir -p "$T/mnt/disk1/movies/$NAME"
+dd if=/dev/urandom of="$T/mnt/disk1/movies/$NAME/data.bin" bs=4k count=100 status=none   # same 400 KiB as the item it replaces
+find "$T/mnt/disk1/movies/$NAME" -exec touch -h -d '2 hours ago' {} +
+bash "$ENGINE" plan; rc=$?
+ACC=$'\xc3\xa9'   # the raw UTF-8 bytes for e-acute
+check "readable non-ASCII names appear in the move script" '[[ $rc == 0 ]] && grep "^rsync " "$T/run/moves.sh" 2>/dev/null | grep -qF "$ACC"'
 
 echo "== pause / resume / stop"
 make_fixture extra
