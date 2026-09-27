@@ -113,7 +113,7 @@ Markdown="false"
   <div class="head">
     <div>
       <div class="eyebrow"><?=htmlspecialchars(strtoupper($var['NAME'] ?? 'UNRAID'))?> · UNRAID ARRAY</div>
-      <div class="title-row"><h1>Array Rebalance</h1><span class="pill" id="rb-pill"><i></i><span>Loading</span></span><a class="pill" id="rb-moves-pill" href="#rb-moves" hidden>View move script</a></div>
+      <div class="title-row"><h1>Array Rebalance</h1><span class="pill" id="rb-pill"><i></i><span>Loading</span></span><a class="pill localURL" id="rb-moves-pill" href="#rb-moves" hidden>View move script</a></div>
       <div class="muted" id="rb-meta">&nbsp;</div>
     </div>
     <div class="actions" id="rb-actions"></div>
