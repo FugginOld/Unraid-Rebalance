@@ -125,7 +125,7 @@ check_control() {  # returns 1 when the run should end
   log "PAUSED by user"; pause_begin user
   while c=$(control_word); [[ $c == pause ]]; do sleep 3; done
   [[ $c == stop ]] && { STOP_REQ=1; return 1; }
-  rm -f "$RUN/control"
+  # keep the file: a leftover "resume" reads as continue, and a stop may already have replaced it
   log "RESUMED by user"; pause_end
 }
 

@@ -136,6 +136,29 @@ sed -i 's/^mdResyncPos=.*/mdResyncPos="0"/' "$T/var.ini"; sleep 3    # > the 1 s
 check "resumes when parity is idle, pause time counted" '[[ $(st state) == running && -z $(st paused_since) ]] && (( $(st paused_s) >= 2 ))'
 pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
 
+echo "== stop sent just as a pause is resumed"
+make_fixture extra
+ctl() { echo "$1" > "$T/run/control.tmp" && mv -f "$T/run/control.tmp" "$T/run/control"; }   # atomic, like rebalance-ctl
+REAL_CAT=$(command -v cat)
+mkdir -p "$T/race"
+cat > "$T/race/cat" <<EOF
+#!/bin/bash
+# the engine reads the control file with cat; the first time it reads "resume", a stop lands straight after the read
+"$REAL_CAT" "\$@"; rc=\$?
+if [[ \$1 == "$T/run/control" && ! -e "$T/race/fired" && \$("$REAL_CAT" "\$1" 2>/dev/null) == resume ]]; then
+  touch "$T/race/fired"; echo stop > "$T/run/control.tmp" && mv -f "$T/run/control.tmp" "$T/run/control"
+fi
+exit \$rc
+EOF
+chmod +x "$T/race/cat"
+PATH=$T/race:$T/slow:$PATH setsid bash "$ENGINE" run & sleep 2.5
+ctl pause
+for _ in $(seq 20); do [[ $(st state) == paused ]] && break; sleep 0.5; done
+np=$(st done_count); ctl resume
+for _ in $(seq 40); do [[ $(st state) == running || $(st state) == paused ]] || break; sleep 0.5; done
+check "a stop sent right after resume is kept" '[[ $(st state) == stopped ]] && (( $(st done_count) - np <= 1 ))'
+pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
+
 echo "== abort"
 make_fixture extra
 PATH=$T/slow:$PATH setsid bash "$ENGINE" run & sleep 2
