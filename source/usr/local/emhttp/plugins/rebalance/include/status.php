@@ -67,7 +67,7 @@ $current = null;
 $curIdx  = (int)($st['cur_idx'] ?? 0);
 if (in_array($state, ['running', 'paused'], true) && $curIdx && isset($plan[$curIdx]) && !isset($handled[$curIdx])) {
   $current = $plan[$curIdx] + ['started' => (int)($st['cur_started'] ?? 0), 'bytes' => 0, 'pct' => 0,
-                               'rate' => 0, 'file' => null];
+                               'rate' => 0, 'file' => null, 'cmd' => $st['cur_cmd'] ?? ''];
   $pr = trim((string)@file_get_contents("$run/progress"));
   if ($pr !== '') {
     $p = array_pad(preg_split('/\s+/', $pr), 5, '0');
@@ -163,6 +163,7 @@ echo json_encode([
   'state'      => $state,
   'mode'       => $st['mode'] ?? null,
   'msg'        => $st['msg'] ?? '',
+  'warn'       => ($st['warn'] ?? '') === '1',
   'pause_reason' => $st['pause_reason'] ?? '',
   'paused_s'   => (int)($st['paused_s'] ?? 0) + ($state === 'paused' && !empty($st['paused_since']) ? max(0, time() - (int)$st['paused_since']) : 0),
   'request'    => $alive && in_array($req = trim((string)@file_get_contents("$run/control")), ['pause', 'stop'], true) ? $req : '',

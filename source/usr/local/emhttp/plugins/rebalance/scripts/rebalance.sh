@@ -19,8 +19,11 @@ LOG=${RB_LOG:-/var/log/$PLUGIN.log}
 MNT=${RB_MNT:-/mnt}
 VAR_INI=${RB_VAR_INI:-/var/local/emhttp/var.ini}
 SHARE_CFG_DIR=${RB_SHARE_CFG:-/boot/config}
-NOTIFY_BIN=/usr/local/emhttp/webGui/scripts/notify
+NOTIFY_BIN=${RB_NOTIFY_BIN:-/usr/local/emhttp/webGui/scripts/notify}
 MDCMD=/usr/local/sbin/mdcmd
+BUSY_POLL_S=30   # parity/mover re-check while paused; RB_BUSY_POLL_S shortens it in tests only (RB_MNT is never set in production)
+[[ -n $RB_MNT && $RB_BUSY_POLL_S =~ ^[1-9][0-9]*$ ]] && BUSY_POLL_S=$RB_BUSY_POLL_S
+QUOTE_LC=$(locale -a 2>/dev/null | grep -m1 -ixE 'c\.utf-?8|en_us\.utf-?8')   # a UTF-8 locale this box has, so shown commands keep accented names readable; none = escaped
 MODE=$1
 
 ############################## CONFIG ##############################
@@ -123,7 +126,7 @@ check_control() {  # returns 1 when the run should end
   log "PAUSED by user"; pause_begin user
   while c=$(control_word); [[ $c == pause ]]; do sleep 3; done
   [[ $c == stop ]] && { STOP_REQ=1; return 1; }
-  rm -f "$RUN/control"
+  # keep the file: a leftover "resume" reads as continue, and a stop may already have replaced it
   log "RESUMED by user"; pause_end
 }
 
@@ -138,7 +141,7 @@ wait_until_clear() {  # returns 1 if a stop was requested while waiting
     [[ $reason == "array stopped" ]] && die "Array was stopped during the run"
     [[ $(control_word) == stop ]] && { STOP_REQ=1; return 1; }
     (( SECONDS - start > MAX_PAUSE_HOURS * 3600 )) && die "Paused over ${MAX_PAUSE_HOURS}h waiting on $reason"
-    sleep 30
+    sleep "$BUSY_POLL_S"
   done
   log "RESUMED after $(( (SECONDS - start) / 60 )) min"; pause_end
 }
@@ -242,7 +245,7 @@ build_candidates() {  # disk -> "sizeKiB<TAB>path" NUL records, largest first
     [[ -d $dir ]] || continue
     share=${dir%/}; share=${share##*/}
     share_eligible "$share" || continue
-    find "$MNT/$d/$share" -mindepth "$ITEM_DEPTH" -maxdepth "$ITEM_DEPTH" ! -name '.*' ! -name $'*\n*' ! -name $'*\t*' -print0 \
+    find "$MNT/$d/$share" -mindepth "$ITEM_DEPTH" -maxdepth "$ITEM_DEPTH" ! -name '.*' ! -path $'*\n*' ! -path $'*\t*' -print0 \
       | xargs -0 -r du -sk --null -- 2>/dev/null
   done | sort -z -t$'\t' -k1,1nr > "$RUN/cand.$d"
 }
@@ -258,13 +261,34 @@ progress_reader() {  # rsync --info=progress2 emits CR-separated updates
       "${BASH_REMATCH[4]}" "$EPOCHSECONDS" > "$RUN/progress.tmp" && mv -f "$RUN/progress.tmp" "$RUN/progress"
   done
 }
+rsync_argv() {  # src dst rel -> RSYNC_ARGV: the one definition of the move command; RSYNC_LINE: the same argv, shell-quoted
+  RSYNC_ARGV=(rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$MNT/$1/./$3" "$MNT/$2/")
+  LC_ALL=${QUOTE_LC:-C} printf -v RSYNC_LINE '%q ' "${RSYNC_ARGV[@]}"; RSYNC_LINE=${RSYNC_LINE% }   # C always exists: escaped, never a setlocale warning
+}
 run_rsync() {  # src dst rel
-  rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive \
-    "$MNT/$1/./$3" "$MNT/$2/" </dev/null | progress_reader
+  rsync_argv "$@"
+  st_set cur_cmd "$RSYNC_LINE"   # the dashboard shows the argv that runs on the next line
+  "${RSYNC_ARGV[@]}" </dev/null | progress_reader
   return "${PIPESTATUS[0]}"
 }
 history() {  # idx result reason kib src dst start end rel
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$@" >> "$RUN/history.tsv"
+}
+write_move_script() {  # plan.tsv -> moves.sh: the dry run's moves as the exact commands, to read; nothing runs it
+  local idx sz src dst rel
+  { printf '%s\n' '#!/bin/bash' \
+      '# Array Rebalance - move plan from a dry run, for review only.' \
+      '# Start rebalance in the dashboard rebuilds the plan from current disk usage,' \
+      '# so the real run may differ from this list.' \
+      '# Running these commands yourself bypasses the engine safety checks: open-file and' \
+      '# hardlink skips, the parity and mover pause, collision checks, per-move' \
+      '# verification and empty-folder cleanup.' \
+      'echo "Review only - start the rebalance from the dashboard"; exit 1'
+    while IFS=$'\t' read -r idx sz src dst rel; do
+      rsync_argv "$src" "$dst" "$rel"
+      printf '\n# %s  %s  %s -> %s\n%s\n' "$idx" "$(human "$sz")" "$MNT/$src/$rel" "$MNT/$dst/" "$RSYNC_LINE"
+    done < "$RUN/plan.tsv"
+  } > "$RUN/moves.sh"
 }
 
 ############################## MAIN ##############################
@@ -277,7 +301,7 @@ flock -n 9 || { echo "a rebalance is already running" >&2; exit 1; }
 [[ -f $LOG ]] && mv -f "$LOG" "$LOG.1"
 exec >>"$LOG" 2>&1
 echo $$ > "$RUN/pid"
-rm -f "$RUN"/{control,progress,plan.tsv,history.tsv,start.tsv,reads.prev} "$RUN"/cand.*
+rm -f "$RUN"/{control,progress,plan.tsv,history.tsv,start.tsv,reads.prev,moves.sh} "$RUN"/cand.*
 load_cfg
 
 on_exit() {
@@ -313,7 +337,7 @@ st_set target_ppm "$ratio_ppm"
 report "BEFORE"
 
 # ---------- PLAN (simulated greedy, largest items first) ----------
-declare -A EXHAUSTED DONE PLANNED_AT
+declare -A EXHAUSTED DONE PLANNED_AT NOCAND
 plan_count=0; plan_kib=0; plan_skipped=0
 : > "$RUN/plan.tsv"
 while :; do
@@ -325,6 +349,7 @@ while :; do
   done
   [[ -z $donor ]] && break
   [[ -f $RUN/cand.$donor ]] || { log "Scanning $donor (depth $ITEM_DEPTH)"; build_candidates "$donor"; }
+  [[ -s $RUN/cand.$donor ]] || NOCAND[$donor]=1   # nothing in included shares at ITEM_DEPTH
 
   picked=0
   while IFS=$'\t' read -r -d '' sz path; do
@@ -347,6 +372,7 @@ while :; do
     done
     [[ -z $recv ]] && continue
     DONE[$path]=1
+    [[ -n $(find "$path" -type f -size +0c -print -quit 2>/dev/null) ]] || continue   # no file with data (empty folder): moving it frees nothing (#7)
     why=""
     if ! item_static_ok "$path" why; then
       log "PLAN-SKIP $(human "$sz")  $path  ($why)"; (( plan_skipped++ )); continue
@@ -369,12 +395,16 @@ log "Plan: $summary"
 
 if (( plan_count == 0 )); then   # EXHAUSTED = a disk was over tolerance but had nothing eligible
   if (( ${#EXHAUSTED[@]} && plan_skipped )); then msg="Nothing can be moved - $plan_skipped item(s) left out (in-progress or hardlinked), see log"
+  elif (( ${#EXHAUSTED[@]} && ${#NOCAND[@]} == ${#EXHAUSTED[@]} )); then msg="Nothing can be moved - the over-full disk has no items in included shares"
   elif (( ${#EXHAUSTED[@]} )); then msg="Nothing can be moved - no receiving disk or size limit fits the over-full disk's items"
   else msg="Nothing to move - array is already balanced"; fi
-  FINAL=done; st_set state done msg "$msg"; notify normal "$msg"
+  FINAL=done
+  if (( ${#EXHAUSTED[@]} )); then st_set state done warn 1 msg "$msg"; notify warning "$msg"
+  else st_set state done msg "$msg"; notify normal "$msg"; fi
   exit 0
 fi
 if [[ $MODE == plan ]]; then
+  write_move_script
   FINAL=planned; st_set state planned msg "$summary"
   notify normal "Dry run: $summary"
   exit 0
@@ -386,7 +416,7 @@ done_count=0; done_kib=0; skipped=0; turbo_tried=0
 while IFS=$'\t' read -r idx sz src dst rel; do
   check_control || break
   wait_until_clear || break
-  st_set cur_idx "$idx" cur_started "$EPOCHSECONDS"
+  st_set cur_idx "$idx" cur_started "$EPOCHSECONDS" cur_cmd ""
   t0=$EPOCHSECONDS; reason=""
   if   [[ ! -e $MNT/$src/$rel ]]; then reason="source no longer exists"
   elif [[ -e $MNT/$dst/$rel ]];   then reason="already exists on $dst"

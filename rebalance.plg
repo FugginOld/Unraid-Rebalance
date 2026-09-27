@@ -17,6 +17,32 @@
         icon="balance-scale" min="6.12.0" support="https://github.com/&author;/&repo;/issues">
 
 <CHANGES>
+###2026.09.28###
+**Added**
+- The dashboard follows the Unraid display theme (Black, Gray, White or
+  Azure) instead of always drawing a dark panel.
+- The "Now moving" card shows the exact rsync command for the current move.
+- After a dry run, a "View move script" pill jumps to a Move script panel
+  that lists the planned moves as rsync commands, for review only. The
+  script exits before its first command; Start rebalance rebuilds the plan
+  and runs every safety check. A link next to "Download full log" opens it
+  in a new tab.
+- Keyboard focus rings and press feedback on buttons, links and inputs.
+
+**Fixed**
+- Empty folders are no longer planned or moved. Moving them freed no space,
+  changed where new files land, and could hide the "Nothing can be moved"
+  warning. (#7)
+- "Nothing can be moved" now shows as a warning (amber status and message,
+  and a warning notification) instead of a green Done. (#4)
+- When the over-full disk has nothing in the included shares, the result
+  now says so, instead of pointing at the free-space and size limits. (#4)
+- A stop sent just as a paused run was resumed could be lost; it is now
+  kept. (#6)
+- At item depth 2 or 3, an item under a folder whose name contains a line
+  break is skipped instead of breaking the plan.
+- Settings inputs now have a border that stands out from the panel.
+
 ###2026.09.27###
 **Fixed**
 - A dry run that finds nothing to move now says why ("already balanced", or

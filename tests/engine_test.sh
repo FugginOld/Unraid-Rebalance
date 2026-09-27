@@ -9,6 +9,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 PLUG=$REPO/source/usr/local/emhttp/plugins/rebalance
 ENGINE=$PLUG/scripts/rebalance.sh
 STATUS=$PLUG/include/status.php
+SCRIPT=$PLUG/include/script.php
 T=$(mktemp -d)
 trap 'pkill -f "$T" 2>/dev/null; rm -rf "$T"' EXIT
 FAILS=0
@@ -17,9 +18,10 @@ pass() { printf '  ok    %s\n' "$1"; }
 fail() { printf '  FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
 check() { if eval "$2"; then pass "$1"; else fail "$1"; fi; }
 st() { sed -n "s/^$1=//p" "$T/run/status" 2>/dev/null; }
+started() { for _ in $(seq 40); do [[ -n $(st state) ]] && return; sleep 0.25; done; }   # status is written after the engine clears the control file
 
 make_fixture() {
-  rm -rf "$T/mnt" "$T/run" "$T/sizes" "$T/cfg" "$T/bin"
+  rm -rf "$T/mnt" "$T/run" "$T/sizes" "$T/cfg" "$T/bin" "$T/notify.log"
   mkdir -p "$T/bin" "$T/sizes" "$T/run" "$T/cfg/shares"
   cat > "$T/bin/df" <<EOF
 #!/bin/bash
@@ -33,6 +35,7 @@ for p in "\${paths[@]}"; do
 done
 EOF
   chmod +x "$T/bin/df"
+  printf '#!/bin/bash\necho "$*" >> "%s/notify.log"\n' "$T" > "$T/bin/notify"; chmod +x "$T/bin/notify"   # records each notify call: ... -i <level>
   local M=$T/mnt
   mk() { mkdir -p "$M/$1/$2"; dd if=/dev/urandom of="$M/$1/$2/data.bin" bs=4k count=$(( $3 / 4 )) status=none; }
   echo 2000 > "$T/sizes/disk1"; echo 2000 > "$T/sizes/disk2"; echo 4000 > "$T/sizes/disk3"; echo 4000 > "$T/sizes/disk4"
@@ -51,26 +54,47 @@ EOF
   printf 'TOLERANCE_PCT="5"\nMIN_FREE_GB="0"\nSKIP_RECENT_MIN="15"\nNOTIFY="false"\r\n' > "$T/rb.cfg"
 }
 
-export RB_MNT=$T/mnt RB_RUN=$T/run RB_LOG=$T/rb.log RB_VAR_INI=$T/var.ini RB_SHARE_CFG=$T/cfg RB_CFG=$T/rb.cfg
+export RB_MNT=$T/mnt RB_RUN=$T/run RB_LOG=$T/rb.log RB_VAR_INI=$T/var.ini RB_SHARE_CFG=$T/cfg RB_CFG=$T/rb.cfg RB_NOTIFY_BIN=$T/bin/notify
 export PATH=$T/bin:$PATH
 
 echo "== plan (dry run)"
 make_fixture
+mkdir -p "$T/mnt/disk1/movies/Empty Folder" && touch -h -d '2 hours ago' "$T/mnt/disk1/movies/Empty Folder"   # #7: an empty folder at item depth on the over-full disk, aged like the rest of the fixture
 bash "$ENGINE" plan; rc=$?
 check "plan exits 0"                         '[[ $rc == 0 ]]'
 check "state is planned"                     '[[ $(st state) == planned ]]'
 check "one move planned"                     '[[ $(st plan_count) == 1 ]]'
 check "hardlinked items left out (2)"        '[[ $(st plan_skipped) == 2 ]]'
+check "empty folder is never planned"        '! grep -q "Empty Folder" "$T/run/plan.tsv"'
 check "tv never planned onto disk4 (share excluded)" '! grep -P "\tdisk4\ttv/" "$T/run/plan.tsv"'
 check "CRLF share config parsed (a plan exists)"     '[[ -s $T/run/plan.tsv ]]'
 check "nothing moved by a dry run"           '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" ]]'
+cp "$T/run/moves.sh" "$T/dry-moves.sh" 2>/dev/null
+guard=$(PATH=/nonexistent /bin/bash "$T/run/moves.sh" 2>&1); grc=$?   # no rsync on PATH: a missing guard still moves nothing
+check "dry run writes a move script"         '[[ -s $T/run/moves.sh ]]'
+check "move script stops at its review-only guard" '[[ $grc == 1 && $guard == "Review only - start the rebalance from the dashboard" ]]'
+check "move script has one rsync line per planned move" '[[ $(grep -c "^rsync " "$T/run/moves.sh" 2>/dev/null) == "$(st plan_count)" ]]'
+check "script.php serves the move script"    '[[ -s $T/run/moves.sh && $(php "$SCRIPT" 2>/dev/null) == "$(cat "$T/run/moves.sh")" ]]'
 
 echo "== run"
-bash "$ENGINE" run; rc=$?
+REAL_RSYNC=$(command -v rsync)
+mkdir -p "$T/argv"; rm -f "$T/rsync.argv"
+cat > "$T/argv/rsync" <<EOF
+#!/bin/bash
+# records the argv the engine ran rsync with, one per line, then does the real copy
+printf '%s\n' "\${0##*/}" "\$@" >> "$T/rsync.argv"
+exec "$REAL_RSYNC" "\$@"
+EOF
+chmod +x "$T/argv/rsync"
+PATH=$T/argv:$PATH bash "$ENGINE" run; rc=$?
 check "run exits 0"                          '[[ $rc == 0 ]]'
 check "state is done"                        '[[ $(st state) == done ]]'
 check "item arrived on disk4"                '[[ -f "$T/mnt/disk4/movies/Movie One (2020)/data.bin" ]]'
 check "item gone from disk1"                 '[[ ! -e "$T/mnt/disk1/movies/Movie One (2020)" ]]'
+check "run executes the pinned rsync command" '[[ $(cat "$T/rsync.argv" 2>/dev/null) == "$(printf "%s\n" rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$T/mnt/disk1/./movies/Movie One (2020)" "$T/mnt/disk4/")" ]]'
+check "empty folder stays on disk1 after the run" '[[ -d "$T/mnt/disk1/movies/Empty Folder" ]]'
+while IFS= read -r l; do a=(); eval "a=($l)" 2>/dev/null; printf '%s\n' "${a[@]}"; done < <(grep '^rsync ' "$T/dry-moves.sh" 2>/dev/null) > "$T/script.argv"
+check "move script commands are the commands the run executed" '[[ -s $T/script.argv ]] && cmp -s "$T/script.argv" "$T/rsync.argv"'
 check "history records the move"             'grep -q "	done	" "$T/run/history.tsv"'
 check "pid file cleaned up"                  '[[ ! -f $T/run/pid ]]'
 json=$(php "$STATUS")
@@ -82,13 +106,64 @@ make_fixture; rm -rf "$T"/mnt/disk*/*               # empty disks: nothing is ov
 bash "$ENGINE" plan; rc=$?
 check "balanced dry run exits 0"             '[[ $rc == 0 && $(st plan_count) == 0 ]]'
 check "balanced dry run says nothing to move" '[[ $(st state) == done && $(st msg) == *"already balanced"* ]]'
+check "balanced result is not a warning"     'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"warn\"] is False"'
 
 echo "== dry run with an over-full disk but nothing eligible"
 make_fixture
+sed -i 's/NOTIFY="false"/NOTIFY="true"/' "$T/rb.cfg"
 for d in "$T"/mnt/disk1/*/*/; do touch "$d/x.part"; done    # every item on the donor looks in-progress
 bash "$ENGINE" plan; rc=$?
 check "stuck dry run plans nothing"          '[[ $rc == 0 && $(st plan_count) == 0 && $(st plan_skipped) -ge 1 ]]'
-check "stuck dry run does not claim balanced" '[[ $(st state) == done && $(st msg) == "Nothing can be moved"* ]]'
+check "stuck dry run says how many items were left out" '[[ $(st state) == done && $(st msg) == "Nothing can be moved - $(st plan_skipped) item(s) left out"* ]]'
+check "stuck dry run sends a warning notification" 'grep -q -- "-i warning" "$T/notify.log"'
+check "status.php flags the stuck result as a warning" 'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"warn\"] is True"'
+
+echo "== dry run with an over-full disk but no receiving disk with room"
+make_fixture
+sed -i 's/MIN_FREE_GB="0"/MIN_FREE_GB="1"/' "$T/rb.cfg"      # 1 GiB free-space floor: no fake disk can receive anything
+bash "$ENGINE" plan; rc=$?
+check "size-limited dry run explains the limit" '[[ $rc == 0 && $(st plan_count) == 0 && $(st plan_skipped) == 0 && $(st state) == done && $(st msg) == "Nothing can be moved - no receiving disk or size limit fits"* ]]'
+
+echo "== dry run with an over-full disk whose items are all in excluded shares"
+make_fixture
+echo 'EXCLUDE_SHARES="tv,movies,downloads"' >> "$T/rb.cfg"
+bash "$ENGINE" plan; rc=$?
+check "excluded-only dry run blames share exclusion" '[[ $rc == 0 && $(st plan_count) == 0 && $(st msg) == "Nothing can be moved - the over-full disk has no items in included shares" ]]'
+
+echo "== dry run with an over-full disk holding only empty folders and items that do not fit"
+make_fixture
+rm -rf "$T/mnt/disk1/movies" "$T/mnt/disk1/downloads"; mkdir -p "$T/mnt/disk1/tv/Empty Show (2019)"   # tv may not go to disk4, and both shows are too big for disk2 and disk3
+bash "$ENGINE" plan; rc=$?
+check "empty folders do not hide the nothing-can-be-moved warning" '[[ $rc == 0 && $(st plan_count) == 0 && $(st state) == done && $(st warn) == 1 && $(st msg) == "Nothing can be moved - no receiving disk or size limit fits"* ]]'
+
+echo "== a non-ASCII item name in the move script"
+make_fixture
+printf -v NAME 'Caf\xc3\xa9 (2019)'   # readable accented name, built from raw UTF-8 bytes
+rm -rf "$T/mnt/disk1/movies/Movie One (2020)"
+mkdir -p "$T/mnt/disk1/movies/$NAME"
+dd if=/dev/urandom of="$T/mnt/disk1/movies/$NAME/data.bin" bs=4k count=100 status=none   # same 400 KiB as the item it replaces
+find "$T/mnt/disk1/movies/$NAME" -exec touch -h -d '2 hours ago' {} +
+bash "$ENGINE" plan; rc=$?
+ACC=$'\xc3\xa9'   # the raw UTF-8 bytes for e-acute
+check "readable non-ASCII names appear in the move script" '[[ $rc == 0 ]] && grep "^rsync " "$T/run/moves.sh" 2>/dev/null | grep -qF "$ACC"'
+mkdir -p "$T/noloc"   # a box whose locale -a lists no UTF-8 locale (Golem has no C.UTF-8): the engine must not set one
+printf '#!/bin/bash\nprintf "C\\nPOSIX\\n"\n' > "$T/noloc/locale"; chmod +x "$T/noloc/locale"
+PATH=$T/noloc:$PATH bash "$ENGINE" plan; rc=$?
+ESC='\303\251'   # e-acute as printf %q escapes it without a UTF-8 locale
+check "without a listed UTF-8 locale, names stay escaped" '[[ $rc == 0 ]] && grep "^rsync " "$T/run/moves.sh" 2>/dev/null | grep -qF "$ESC"'
+sed 's/^TOLERANCE_PCT=.*/TOLERANCE_PCT="99"/' "$T/rb.cfg" > "$T/bal.cfg"   # every disk within tolerance: nothing to plan
+RB_CFG=$T/bal.cfg bash "$ENGINE" plan; rc=$?
+check "a new run clears the previous move script" '[[ $rc == 0 && $(st plan_count) == 0 && ! -e $T/run/moves.sh ]]'
+
+echo "== a newline or tab in a parent folder at item depth 2"
+for sep in $'\n' $'\t'; do   # the item that would be planned now sits under a name that splits plan.tsv
+  make_fixture
+  mv "$T/mnt/disk1/movies/Movie One (2020)" "$T/mnt/disk1/movies/Movie${sep}One"
+  echo 'ITEM_DEPTH="2"' >> "$T/rb.cfg"
+  bash "$ENGINE" plan; rc=$?
+  what=$([[ $sep == $'\n' ]] && echo newline || echo tab)
+  check "a parent folder name with a $what is never planned" '[[ $rc == 0 && $(st plan_count) == 0 ]] && ! awk -F"\t" "NF != 5 { bad=1 } END { exit !bad }" "$T/run/plan.tsv"'
+done
 
 echo "== pause / resume / stop"
 make_fixture extra
@@ -97,6 +172,7 @@ REAL_RSYNC=$(command -v rsync)
 cat > "$T/slow/rsync" <<EOF
 #!/bin/bash
 # emits rsync --info=progress2 style updates, then does the real copy
+printf '%s\n' "\${0##*/}" "\$@" > "$T/slow.argv"
 for p in 10 40 70; do printf '      1,234,567  %s%%    2.50MB/s    0:00:03\\r' \$p; sleep 1; done
 exec "$REAL_RSYNC" "\$@"
 EOF
@@ -115,8 +191,58 @@ echo resume > "$T/run/control"; sleep 4    # > the 3 s pause poll
 check "resumed"                              '[[ $(st state) == running ]]'
 check "pause time accumulated on resume"     '(( $(st paused_s) >= 2 )) && [[ -z $(st paused_since) ]]'
 check "status.php: no pending request after resume" 'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"request\"]==\"\""'
-echo stop > "$T/run/control"; sleep 5
-check "stopped after the current move"       '[[ $(st state) == stopped ]] && (( $(st done_count) >= 2 && $(st done_count) < 6 ))'
+echo stop > "$T/run/control"; n=$(st done_count)     # read after the request: only the move in flight may still finish
+check "moves remain after the stop request"  '(( $(st plan_count) - n >= 2 ))'
+for _ in $(seq 40); do [[ $(st state) == running ]] || break; sleep 0.5; done
+check "stopped after the current move"       '[[ $(st state) == stopped ]] && (( $(st done_count) - n <= 1 ))'
+
+echo "== parity check pause"
+make_fixture extra
+PATH=$T/slow:$PATH RB_BUSY_POLL_S=1 setsid bash "$ENGINE" run & sleep 2.5
+sed -i 's/^mdResyncPos="0"/mdResyncPos="1000"/' "$T/var.ini"   # a parity check starts during the first move
+sleep 5
+check "parity check pauses before the next move" '[[ $(st state) == paused && $(st pause_reason) == "parity check/rebuild" && $(st paused_since) =~ ^[0-9]+$ ]]'
+sed -i 's/^mdResyncPos=.*/mdResyncPos="0"/' "$T/var.ini"; sleep 3    # > the 1 s poll set by RB_BUSY_POLL_S
+check "resumes when parity is idle, pause time counted" '[[ $(st state) == running && -z $(st paused_since) ]] && (( $(st paused_s) >= 2 ))'
+pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
+
+echo "== stop sent just as a pause is resumed"
+make_fixture extra
+ctl() { echo "$1" > "$T/run/control.tmp" && mv -f "$T/run/control.tmp" "$T/run/control"; }   # atomic, like rebalance-ctl
+REAL_CAT=$(command -v cat)
+mkdir -p "$T/race"
+cat > "$T/race/cat" <<EOF
+#!/bin/bash
+# the engine reads the control file with cat; the first time it reads "resume", a stop lands straight after the read
+"$REAL_CAT" "\$@"; rc=\$?
+if [[ \$1 == "$T/run/control" && ! -e "$T/race/fired" && \$("$REAL_CAT" "\$1" 2>/dev/null) == resume ]]; then
+  touch "$T/race/fired"; echo stop > "$T/run/control.tmp" && mv -f "$T/run/control.tmp" "$T/run/control"
+fi
+exit \$rc
+EOF
+chmod +x "$T/race/cat"
+PATH=$T/race:$T/slow:$PATH setsid bash "$ENGINE" run & started
+ctl pause
+for _ in $(seq 20); do [[ $(st state) == paused ]] && break; sleep 0.5; done
+np=$(st done_count); ctl resume
+for _ in $(seq 40); do [[ $(st state) == running || $(st state) == paused ]] || break; sleep 0.5; done
+check "a stop sent right after resume is kept" '[[ $(st state) == stopped ]] && (( $(st done_count) - np <= 1 ))'
+pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
+
+echo "== the current move shows its rsync command"
+make_fixture extra
+rm -f "$T/slow.argv"
+PATH=$T/slow:$PATH setsid bash "$ENGINE" run & started
+shown=""; want=""; shown_argv=()
+for _ in $(seq 40); do   # until rsync runs and the dashboard shows a command; between two moves they can differ for an instant
+  shown=$(php "$STATUS" | python3 -c 'import json,sys; c=json.load(sys.stdin)["current"]; print(c.get("cmd", "") if c else "")' 2>/dev/null)
+  shown_argv=(); eval "shown_argv=($shown)" 2>/dev/null
+  want=$(cat "$T/slow.argv" 2>/dev/null)
+  [[ -n $shown && -n $want && $(printf '%s\n' "${shown_argv[@]}") == "$want" ]] && break
+  sleep 0.25
+done
+check "Now moving shows the rsync command that is running" '[[ -n $shown && -n $want && $(printf "%s\n" "${shown_argv[@]}") == "$want" ]]'
+pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
 
 echo "== abort"
 make_fixture extra
