@@ -21,6 +21,8 @@ VAR_INI=${RB_VAR_INI:-/var/local/emhttp/var.ini}
 SHARE_CFG_DIR=${RB_SHARE_CFG:-/boot/config}
 NOTIFY_BIN=/usr/local/emhttp/webGui/scripts/notify
 MDCMD=/usr/local/sbin/mdcmd
+BUSY_POLL_S=30   # parity/mover re-check while paused; RB_BUSY_POLL_S shortens it in tests only (RB_MNT is never set in production)
+[[ -n $RB_MNT && $RB_BUSY_POLL_S =~ ^[1-9][0-9]*$ ]] && BUSY_POLL_S=$RB_BUSY_POLL_S
 MODE=$1
 
 ############################## CONFIG ##############################
@@ -138,7 +140,7 @@ wait_until_clear() {  # returns 1 if a stop was requested while waiting
     [[ $reason == "array stopped" ]] && die "Array was stopped during the run"
     [[ $(control_word) == stop ]] && { STOP_REQ=1; return 1; }
     (( SECONDS - start > MAX_PAUSE_HOURS * 3600 )) && die "Paused over ${MAX_PAUSE_HOURS}h waiting on $reason"
-    sleep 30
+    sleep "$BUSY_POLL_S"
   done
   log "RESUMED after $(( (SECONDS - start) / 60 )) min"; pause_end
 }

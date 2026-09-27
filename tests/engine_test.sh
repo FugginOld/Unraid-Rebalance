@@ -88,7 +88,13 @@ make_fixture
 for d in "$T"/mnt/disk1/*/*/; do touch "$d/x.part"; done    # every item on the donor looks in-progress
 bash "$ENGINE" plan; rc=$?
 check "stuck dry run plans nothing"          '[[ $rc == 0 && $(st plan_count) == 0 && $(st plan_skipped) -ge 1 ]]'
-check "stuck dry run does not claim balanced" '[[ $(st state) == done && $(st msg) == "Nothing can be moved"* ]]'
+check "stuck dry run says how many items were left out" '[[ $(st state) == done && $(st msg) == "Nothing can be moved - $(st plan_skipped) item(s) left out"* ]]'
+
+echo "== dry run with an over-full disk but no receiving disk with room"
+make_fixture
+sed -i 's/MIN_FREE_GB="0"/MIN_FREE_GB="1"/' "$T/rb.cfg"      # 1 GiB free-space floor: no fake disk can receive anything
+bash "$ENGINE" plan; rc=$?
+check "size-limited dry run explains the limit" '[[ $rc == 0 && $(st plan_count) == 0 && $(st plan_skipped) == 0 && $(st state) == done && $(st msg) == "Nothing can be moved - no receiving disk or size limit fits"* ]]'
 
 echo "== pause / resume / stop"
 make_fixture extra
@@ -115,8 +121,20 @@ echo resume > "$T/run/control"; sleep 4    # > the 3 s pause poll
 check "resumed"                              '[[ $(st state) == running ]]'
 check "pause time accumulated on resume"     '(( $(st paused_s) >= 2 )) && [[ -z $(st paused_since) ]]'
 check "status.php: no pending request after resume" 'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"request\"]==\"\""'
-echo stop > "$T/run/control"; sleep 5
-check "stopped after the current move"       '[[ $(st state) == stopped ]] && (( $(st done_count) >= 2 && $(st done_count) < 6 ))'
+echo stop > "$T/run/control"; n=$(st done_count)     # read after the request: only the move in flight may still finish
+check "moves remain after the stop request"  '(( $(st plan_count) - n >= 2 ))'
+for _ in $(seq 40); do [[ $(st state) == running ]] || break; sleep 0.5; done
+check "stopped after the current move"       '[[ $(st state) == stopped ]] && (( $(st done_count) - n <= 1 ))'
+
+echo "== parity check pause"
+make_fixture extra
+PATH=$T/slow:$PATH RB_BUSY_POLL_S=1 setsid bash "$ENGINE" run & sleep 2.5
+sed -i 's/^mdResyncPos="0"/mdResyncPos="1000"/' "$T/var.ini"   # a parity check starts during the first move
+sleep 5
+check "parity check pauses before the next move" '[[ $(st state) == paused && $(st pause_reason) == "parity check/rebuild" && $(st paused_since) =~ ^[0-9]+$ ]]'
+sed -i 's/^mdResyncPos=.*/mdResyncPos="0"/' "$T/var.ini"; sleep 3    # > the 1 s poll set by RB_BUSY_POLL_S
+check "resumes when parity is idle, pause time counted" '[[ $(st state) == running && -z $(st paused_since) ]] && (( $(st paused_s) >= 2 ))'
+pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
 
 echo "== abort"
 make_fixture extra
