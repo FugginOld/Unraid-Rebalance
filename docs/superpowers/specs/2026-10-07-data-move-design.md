@@ -42,10 +42,12 @@ Header + actions · message bar · status chips · Overall progress | Now moving
 completed** (one row, equal widths) · **Source | Destination** (one row, equal widths, each scrolls
 internally) · Log · one line pointing to Settings on the Rebalance tab.
 
-States: **Selecting** (idle/done/stopped/aborted/error) and **Active** (planning/running/paused, plus
-`planned` for a move dry run). In Selecting, Overall progress shows the selection total, Moves, Won't fit,
-Destinations and estimated duration, and Up next shows a live client-side preview of the plan. In Active
-both panes are read-only and the cards behave exactly as on the Rebalance tab.
+States: **Selecting** (idle/done/stopped/aborted/error, plus `planned` for a move dry run) and **Active**
+(planning/running/paused). In Selecting, Overall progress shows the selection total, Moves, Won't fit,
+Destinations and estimated duration, and Up next shows a live client-side preview of the plan. After a
+dry run (`planned`) the panes stay editable: the selection lives only in the browser, so locking them
+would leave nothing to start after a reload. The cards show the dry-run plan until a tick changes. In
+Active both panes are read-only and the cards behave exactly as on the Rebalance tab.
 
 ### Source pane
 
