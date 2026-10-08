@@ -207,7 +207,9 @@ EOF
 sel $'item\tdisk1\tmovies' $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk3'
 bash "$ENGINE" move-plan; rc=$?
 check "selection refused: an item inside another item" '[[ $rc == 1 && $(st msg) == "Bad selection: disk1/movies/Movie One (2020) is inside disk1/movies" ]]'
-check "a refused selection moves nothing" '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" && ! -e "$T/mnt/disk3/movies/Movie One (2020)" ]]'
+sel $'item\tdisk1\tmovies/Movie One (2020)' $'bogus\tdisk2\tmovies/Movie Three' $'dest\tdisk3'   # a real run: one good item, one bad line
+bash "$ENGINE" move-run; rc=$?
+check "a refused selection moves nothing" '[[ $rc == 1 && -d "$T/mnt/disk1/movies/Movie One (2020)" && ! -e "$T/mnt/disk3/movies/Movie One (2020)" ]]'
 
 echo "== data move: a folder"
 make_fixture
