@@ -57,6 +57,14 @@ EOF
 export RB_MNT=$T/mnt RB_RUN=$T/run RB_LOG=$T/rb.log RB_VAR_INI=$T/var.ini RB_SHARE_CFG=$T/cfg RB_CFG=$T/rb.cfg RB_NOTIFY_BIN=$T/bin/notify
 export PATH=$T/bin:$PATH
 
+echo "== rsync keeps the source of a file it skips as already existing"
+mkdir -p "$T/rs/src/a" "$T/rs/dst/a"
+echo source > "$T/rs/src/a/f"; echo dest > "$T/rs/dst/a/f"; echo new > "$T/rs/src/a/g"
+rsync -aHAX --remove-source-files --relative --ignore-existing "$T/rs/src/./a" "$T/rs/dst/" >/dev/null 2>&1; rrc=$?
+check "rsync --ignore-existing keeps a skipped source file and the existing destination file" '[[ $rrc == 0 && $(cat "$T/rs/src/a/f" 2>/dev/null) == source && $(cat "$T/rs/dst/a/f") == dest ]]'
+check "rsync --remove-source-files still moves the files it copied" '[[ ! -e $T/rs/src/a/g && $(cat "$T/rs/dst/a/g" 2>/dev/null) == new ]]'
+rm -rf "$T/rs"
+
 echo "== plan (dry run)"
 make_fixture
 mkdir -p "$T/mnt/disk1/movies/Empty Folder" && touch -h -d '2 hours ago' "$T/mnt/disk1/movies/Empty Folder"   # #7: an empty folder at item depth on the over-full disk, aged like the rest of the fixture
