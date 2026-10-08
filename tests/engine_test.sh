@@ -324,6 +324,20 @@ check "browse.php lists a file with its size" 'browse disk1 "movies/Movie One (2
 check "browse.php marks shares excluded in settings" 'browse disk1 "" | python3 -c "import json,sys; e={x[\"name\"]: x[\"excluded\"] for x in json.load(sys.stdin)[\"entries\"]}; assert e[\"downloads\"] and not e[\"tv\"] and not e[\"movies\"], e"'
 rm -rf "$T/mnt/cache"
 
+echo "== action.php move-plan"
+make_fixture
+mkdir -p "$T/ctl"
+printf '#!/bin/bash\necho "$*" >> "%s/ctl.argv"\necho "Started: $1"\n' "$T" > "$T/ctl/rebalance-ctl"; chmod +x "$T/ctl/rebalance-ctl"
+export RB_CTL=$T/ctl/rebalance-ctl
+act() { php -r '$_SERVER["REQUEST_METHOD"] = "POST"; foreach (array_slice($argv, 2) as $a) { [$k, $v] = explode("=", $a, 2); $_POST[$k] = $v; } include $argv[1];' -- "$ACTION" "$@"; }
+j=$(act action=move-plan 'items=[{"disk":"disk1","rel":"movies"},{"disk":"disk1","rel":"movies/Movie One (2020)"}]' 'dests=["disk3"]')
+check "action.php refuses an item inside another item" '[[ $j == *"\"ok\":false"* && $j == *inside* && ! -e $T/ctl.argv ]]'
+j=$(act action=move-plan 'items=[{"disk":"disk1","rel":"movies"}]' 'dests=[]')
+check "action.php refuses an empty destination list" '[[ $j == *"\"ok\":false"* && $j == *destination* && ! -e $T/ctl.argv ]]'
+j=$(act action=move-plan 'items=[{"disk":"disk1","rel":"movies/Movie One (2020)"},{"disk":"disk2","rel":""}]' 'dests=["disk3","disk4"]')
+check "action.php writes the selection and starts move-plan" '[[ $j == *"\"ok\":true"* && $(cat "$T/ctl.argv") == move-plan && $(cat "$T/run/selection.tsv") == "$(printf "item\tdisk1\tmovies/Movie One (2020)\nitem\tdisk2\t\ndest\tdisk3\ndest\tdisk4")" ]]'
+unset RB_CTL
+
 echo "== pause / resume / stop"
 make_fixture extra
 mkdir -p "$T/slow"
