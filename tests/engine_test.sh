@@ -19,6 +19,7 @@ fail() { printf '  FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
 check() { if eval "$2"; then pass "$1"; else fail "$1"; fi; }
 st() { sed -n "s/^$1=//p" "$T/run/status" 2>/dev/null; }
 started() { for _ in $(seq 40); do [[ -n $(st state) ]] && return; sleep 0.25; done; }   # status is written after the engine clears the control file
+sel() { printf '%s\n' "$@" > "$T/run/selection.tsv"; }   # Data Move: one selection.tsv line per argument
 
 make_fixture() {
   rm -rf "$T/mnt" "$T/run" "$T/sizes" "$T/cfg" "$T/bin" "$T/notify.log"
@@ -187,6 +188,26 @@ for sep in $'\n' $'\t'; do   # the item that would be planned now sits under a n
   what=$([[ $sep == $'\n' ]] && echo newline || echo tab)
   check "a parent folder name with a $what is never planned" '[[ $rc == 0 && $(st plan_count) == 0 ]] && ! awk -F"\t" "NF != 5 { bad=1 } END { exit !bad }" "$T/run/plan.tsv"'
 done
+
+echo "== data move: a bad selection is refused"
+make_fixture
+ln -s "$T/mnt/disk2/movies" "$T/mnt/disk1/escape"
+while IFS='|' read -r line want; do
+  sel "${line//\\t/$'\t'}" $'dest\tdisk3'
+  bash "$ENGINE" move-plan; rc=$?
+  check "selection refused ($want): ${line//\\t/ }" '[[ $rc == 1 && $(st state) == error && $(st msg) == "Bad selection"*"$want"* ]]'
+done <<'EOF'
+item\tdisk9\tmovies|is not an included array disk
+item\tdisk1\tmovies/../tv|is not a plain relative path
+item\tdisk1\t/movies|is not a plain relative path
+item\tdisk1\tmovies/Nope|does not exist
+item\tdisk1\tescape|is outside disk1
+bogus\tdisk1\tmovies|unknown line
+EOF
+sel $'item\tdisk1\tmovies' $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "selection refused: an item inside another item" '[[ $rc == 1 && $(st msg) == "Bad selection: disk1/movies/Movie One (2020) is inside disk1/movies" ]]'
+check "a refused selection moves nothing" '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" && ! -e "$T/mnt/disk3/movies/Movie One (2020)" ]]'
 
 echo "== pause / resume / stop"
 make_fixture extra

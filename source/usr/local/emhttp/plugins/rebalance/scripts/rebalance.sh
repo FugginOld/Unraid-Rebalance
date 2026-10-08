@@ -1,7 +1,9 @@
 #!/bin/bash
 # Array Rebalance engine
-#   rebalance.sh plan  -> build the move plan only (dry run)
-#   rebalance.sh run   -> build the plan, then execute it
+#   rebalance.sh plan       -> build the move plan only (dry run)
+#   rebalance.sh run        -> build the plan, then execute it
+#   rebalance.sh move-plan  -> Data Move: plan the ticked items in $RUN/selection.tsv (dry run)
+#   rebalance.sh move-run   -> Data Move: plan the ticked items, then execute
 # Started/controlled by rebalance-ctl. State for the web UI lives in $RUN.
 #
 # Target fill % = total used / total capacity of the included array disks.
@@ -25,6 +27,7 @@ BUSY_POLL_S=30   # parity/mover re-check while paused; RB_BUSY_POLL_S shortens i
 [[ -n $RB_MNT && $RB_BUSY_POLL_S =~ ^[1-9][0-9]*$ ]] && BUSY_POLL_S=$RB_BUSY_POLL_S
 QUOTE_LC=$(locale -a 2>/dev/null | grep -m1 -ixE 'c\.utf-?8|en_us\.utf-?8')   # a UTF-8 locale this box has, so shown commands keep accented names readable; none = escaped
 MODE=$1
+MOVE=false; [[ $MODE == move-plan || $MODE == move-run ]] && MOVE=true   # Data Move: only the PLAN section differs
 
 ############################## CONFIG ##############################
 TOLERANCE_PCT=1; ITEM_DEPTH=1; MIN_FREE_GB=50; MAX_MOVE_GB=0
@@ -291,8 +294,46 @@ write_move_script() {  # plan.tsv -> moves.sh: the dry run's moves as the exact 
   } > "$RUN/moves.sh"
 }
 
+############################## DATA MOVE ##############################
+SEL_ITEMS=(); SEL_DESTS=(); declare -A FULL_SRC
+bad_rel() { [[ $1 == /* || $1 == */ || $1 == *//* || /$1/ == */./* || /$1/ == */../* ]]; }   # true for an absolute path or an empty, . or .. part
+read_selection() {   # $RUN/selection.tsv -> SEL_ITEMS ("disk<TAB>rel"), SEL_DESTS, FULL_SRC. The engine does not trust the file: any bad line is fatal
+  local kind d rel extra p base a
+  local -A seen
+  [[ -f $RUN/selection.tsv ]] || die "Bad selection: $RUN/selection.tsv is missing"
+  while IFS=$'\t' read -r kind d rel extra || [[ -n $kind ]]; do
+    [[ -z $extra ]] || die "Bad selection: a line has more than three fields"
+    [[ $kind == item || $kind == dest ]] || die "Bad selection: unknown line '$kind'"
+    [[ -n $d && -n ${SIZE[$d]} ]] || die "Bad selection: $d is not an included array disk"
+    if [[ $kind == dest ]]; then
+      [[ -z $rel ]] || die "Bad selection: a dest line has a path"
+      SEL_DESTS+=("$d"); continue
+    fi
+    bad_rel "$rel" && die "Bad selection: $d/$rel is not a plain relative path"
+    p=$(realpath -e -- "$MNT/$d${rel:+/$rel}" 2>/dev/null) || die "Bad selection: $MNT/$d/$rel does not exist"
+    base=$(realpath -e -- "$MNT/$d")
+    [[ $p == "$base" || $p == "$base"/* ]] || die "Bad selection: $MNT/$d/$rel is outside $d"
+    [[ -n ${seen["$d/$rel"]} ]] && die "Bad selection: $d/$rel is listed twice"
+    seen["$d/$rel"]=1; SEL_ITEMS+=("$d"$'\t'"$rel")
+    [[ -z $rel ]] && FULL_SRC[$d]=1
+  done < "$RUN/selection.tsv"
+  for a in "${SEL_ITEMS[@]}"; do   # no item inside another: walk each item's parents
+    d=${a%%$'\t'*}; rel=${a#*$'\t'}
+    while [[ -n $rel ]]; do
+      if [[ $rel == */* ]]; then rel=${rel%/*}; else rel=""; fi
+      [[ -n ${seen["$d/$rel"]} ]] && die "Bad selection: $d/${a#*$'\t'} is inside $d${rel:+/$rel}"
+    done
+  done
+  (( ${#SEL_ITEMS[@]} )) || die "Bad selection: no item to move"
+  (( ${#SEL_DESTS[@]} )) || die "Bad selection: no destination disk"
+}
+plan_move() {   # Data Move planner - validation only in this task; Task 4 replaces this function
+  read_selection
+  die "Data Move planning is not built yet"
+}
+
 ############################## MAIN ##############################
-[[ $MODE == plan || $MODE == run ]] || { echo "usage: $0 plan|run" >&2; exit 2; }
+case $MODE in plan|run|move-plan|move-run) ;; *) echo "usage: $0 plan|run|move-plan|move-run" >&2; exit 2 ;; esac
 [[ $EUID -eq 0 || -n $RB_MNT ]] || { echo "must run as root" >&2; exit 1; }
 mkdir -p "$RUN"
 exec 9>"$RUN/lock"
@@ -316,7 +357,7 @@ MIN_FREE_KB=$(( MIN_FREE_GB * 1024 * 1024 ))
 MAX_MOVE_KB=$(( MAX_MOVE_GB * 1024 * 1024 ))
 st_set state planning mode "$MODE" pid $$ started "$EPOCHSECONDS" tol_pct "$TOLERANCE_PCT" \
   plan_count 0 plan_kib 0 plan_skipped 0 done_count 0 done_kib 0 skipped 0 cur_idx 0 turbo off msg ""
-log "Array Rebalance - mode: $MODE"
+if $MOVE; then log "Data Move - mode: $MODE"; else log "Array Rebalance - mode: $MODE"; fi
 
 grep -q '^mdState="STARTED"' "$VAR_INI" 2>/dev/null || die "Array is not started"
 GLOBAL_INC=$(cfg_val shareUserInclude "$SHARE_CFG_DIR/share.cfg")
@@ -336,7 +377,8 @@ done
 st_set target_ppm "$ratio_ppm"
 report "BEFORE"
 
-# ---------- PLAN (simulated greedy, largest items first) ----------
+# ---------- PLAN ----------
+if $MOVE; then plan_move; else   # the rebalance planner below (simulated greedy, largest items first) runs for plan|run only
 declare -A EXHAUSTED DONE PLANNED_AT NOCAND
 plan_count=0; plan_kib=0; plan_skipped=0
 : > "$RUN/plan.tsv"
@@ -403,7 +445,8 @@ if (( plan_count == 0 )); then   # EXHAUSTED = a disk was over tolerance but had
   else st_set state done msg "$msg"; notify normal "$msg"; fi
   exit 0
 fi
-if [[ $MODE == plan ]]; then
+fi   # end of the rebalance planner
+if [[ $MODE == plan || $MODE == move-plan ]]; then
   write_move_script
   FINAL=planned; st_set state planned msg "$summary"
   notify normal "Dry run: $summary"
