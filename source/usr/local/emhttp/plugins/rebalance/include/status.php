@@ -7,24 +7,11 @@ $mnt        = getenv('RB_MNT') ?: '/mnt';
 $varIni     = getenv('RB_VAR_INI') ?: '/var/local/emhttp/var.ini';
 $cfgFile    = getenv('RB_CFG') ?: "/boot/config/plugins/$plugin/$plugin.cfg";
 $defaultCfg = __DIR__ . '/../default.cfg';
+require __DIR__ . '/common.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
-function kv_file($f) {
-  $out = [];
-  if (!is_readable($f)) return $out;
-  foreach (file($f, FILE_IGNORE_NEW_LINES) as $l) {
-    $l = rtrim($l, "\r");
-    $p = strpos($l, '=');
-    if ($p === false) continue;
-    $k = trim(substr($l, 0, $p));
-    $v = substr($l, $p + 1);
-    if (strlen($v) >= 2 && $v[0] === '"' && substr($v, -1) === '"') $v = substr($v, 1, -1);
-    $out[$k] = $v;
-  }
-  return $out;
-}
 function lines($f) {
   if (!is_readable($f)) return [];
   return array_values(array_filter(file($f, FILE_IGNORE_NEW_LINES), 'strlen'));
@@ -33,7 +20,6 @@ function pid_alive($pid) {
   $pid = trim((string)$pid);
   return $pid !== '' && ctype_digit($pid) && file_exists("/proc/$pid");
 }
-function csv($s) { return array_values(array_filter(array_map('trim', explode(',', (string)$s)), 'strlen')); }
 
 $st    = kv_file("$run/status");
 $cfg   = array_merge(kv_file($defaultCfg), kv_file($cfgFile));

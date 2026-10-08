@@ -10,6 +10,8 @@ PLUG=$REPO/source/usr/local/emhttp/plugins/rebalance
 ENGINE=$PLUG/scripts/rebalance.sh
 STATUS=$PLUG/include/status.php
 SCRIPT=$PLUG/include/script.php
+BROWSE=$PLUG/include/browse.php
+ACTION=$PLUG/include/action.php
 T=$(mktemp -d)
 trap 'pkill -f "$T" 2>/dev/null; rm -rf "$T"' EXIT
 FAILS=0
@@ -308,6 +310,19 @@ sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk1\tmovies/Movie One (2020)' $'d
 PATH=$T/late:$PATH bash "$ENGINE" move-run; rc=$?
 check "a conflict that appears after planning is skipped live" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 1 && $(st skipped) == 1 ]] && grep -q "SKIP.*Movie One (2020).*a file already exists" "$T/rb.log"'
 check "a live-skipped item keeps both copies" '[[ $(cat "$T/mnt/disk3/movies/Movie One (2020)/data.bin") == late && -s "$T/mnt/disk1/movies/Movie One (2020)/data.bin" ]]'
+
+echo "== browse.php"
+make_fixture
+printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"
+ln -s "$T/mnt/disk2/movies" "$T/mnt/disk1/movies/Elsewhere"; mkdir -p "$T/mnt/disk1/movies/.hidden" "$T/mnt/cache/movies"
+browse() { php -r '$_GET = ["disk" => $argv[1], "path" => $argv[2]]; include $argv[3];' -- "$1" "$2" "$BROWSE"; }
+for bad in 'disk1|movies/..' 'disk1|/movies' 'cache|movies' 'disk4|tv' 'disk1|movies/Elsewhere' 'disk1|movies/Nope'; do
+  check "browse.php refuses ${bad/|/ }" 'browse "${bad%%|*}" "${bad#*|}" | python3 -c "import json,sys; assert json.load(sys.stdin)[\"ok\"] is False"'
+done
+check "browse.php lists a folder with sizes" 'browse disk1 movies | python3 -c "import json,sys; e={x[\"name\"]: x for x in json.load(sys.stdin)[\"entries\"]}; m=e[\"Movie One (2020)\"]; assert m[\"type\"]==\"dir\" and m[\"kib\"]>=400 and not m[\"excluded\"] and e[\"Elsewhere\"][\"type\"]==\"file\" and \".hidden\" not in e, e"'
+check "browse.php lists a file with its size" 'browse disk1 "movies/Movie One (2020)" | python3 -c "import json,sys; e=json.load(sys.stdin)[\"entries\"]; assert e==[{\"name\":\"data.bin\",\"type\":\"file\",\"kib\":400,\"excluded\":False}], e"'
+check "browse.php marks shares excluded in settings" 'browse disk1 "" | python3 -c "import json,sys; e={x[\"name\"]: x[\"excluded\"] for x in json.load(sys.stdin)[\"entries\"]}; assert e[\"downloads\"] and not e[\"tv\"] and not e[\"movies\"], e"'
+rm -rf "$T/mnt/cache"
 
 echo "== pause / resume / stop"
 make_fixture extra
