@@ -99,7 +99,7 @@ check "run exits 0"                          '[[ $rc == 0 ]]'
 check "state is done"                        '[[ $(st state) == done ]]'
 check "item arrived on disk4"                '[[ -f "$T/mnt/disk4/movies/Movie One (2020)/data.bin" ]]'
 check "item gone from disk1"                 '[[ ! -e "$T/mnt/disk1/movies/Movie One (2020)" ]]'
-check "run executes the pinned rsync command" '[[ $(cat "$T/rsync.argv" 2>/dev/null) == "$(printf "%s\n" rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$T/mnt/disk1/./movies/Movie One (2020)" "$T/mnt/disk4/")" ]]'
+check "run executes the pinned rsync command" '[[ $(cat "$T/rsync.argv" 2>/dev/null) == "$(printf "%s\n" rsync -aHAX --remove-source-files --relative --ignore-existing --info=progress2 --no-inc-recursive "$T/mnt/disk1/./movies/Movie One (2020)" "$T/mnt/disk4/")" ]]'
 check "empty folder stays on disk1 after the run" '[[ -d "$T/mnt/disk1/movies/Empty Folder" ]]'
 while IFS= read -r l; do a=(); eval "a=($l)" 2>/dev/null; printf '%s\n' "${a[@]}"; done < <(grep '^rsync ' "$T/dry-moves.sh" 2>/dev/null) > "$T/script.argv"
 check "move script commands are the commands the run executed" '[[ -s $T/script.argv ]] && cmp -s "$T/script.argv" "$T/rsync.argv"'
@@ -108,6 +108,21 @@ check "pid file cleaned up"                  '[[ ! -f $T/run/pid ]]'
 json=$(php "$STATUS")
 check "status.php returns valid JSON with state done" \
   'python3 -c "import json,sys; d=json.loads(sys.argv[1]); assert d[\"state\"]==\"done\" and d[\"done\"][\"count\"]==1 and len(d[\"disks\"])==4" "$json"'
+
+echo "== a file that appears on the destination during a move is never overwritten"
+make_fixture
+mkdir -p "$T/clash"
+cat > "$T/clash/rsync" <<EOF
+#!/bin/bash
+# a file appears at the destination path between the engine's live checks and the copy
+mkdir -p "$T/mnt/disk4/movies/Movie One (2020)" && echo clash > "$T/mnt/disk4/movies/Movie One (2020)/data.bin"
+exec "$REAL_RSYNC" "\$@"
+EOF
+chmod +x "$T/clash/rsync"
+PATH=$T/clash:$PATH bash "$ENGINE" run; rc=$?
+check "a clash found mid-move stops the run with an error" '[[ $rc == 1 && $(st state) == error ]]'
+check "the clashing destination file is kept" '[[ $(cat "$T/mnt/disk4/movies/Movie One (2020)/data.bin" 2>/dev/null) == clash ]]'
+check "the source copy is kept" '[[ $(stat -c %s "$T/mnt/disk1/movies/Movie One (2020)/data.bin" 2>/dev/null) == 409600 ]]'
 
 echo "== dry run on a balanced array"
 make_fixture; rm -rf "$T"/mnt/disk*/*               # empty disks: nothing is over target

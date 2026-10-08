@@ -262,7 +262,7 @@ progress_reader() {  # rsync --info=progress2 emits CR-separated updates
   done
 }
 rsync_argv() {  # src dst rel -> RSYNC_ARGV: the one definition of the move command; RSYNC_LINE: the same argv, shell-quoted
-  RSYNC_ARGV=(rsync -aHAX --remove-source-files --relative --info=progress2 --no-inc-recursive "$MNT/$1/./$3" "$MNT/$2/")
+  RSYNC_ARGV=(rsync -aHAX --remove-source-files --relative --ignore-existing --info=progress2 --no-inc-recursive "$MNT/$1/./$3" "$MNT/$2/")   # --ignore-existing: never overwrite a file on the destination
   LC_ALL=${QUOTE_LC:-C} printf -v RSYNC_LINE '%q ' "${RSYNC_ARGV[@]}"; RSYNC_LINE=${RSYNC_LINE% }   # C always exists: escaped, never a setlocale warning
 }
 run_rsync() {  # src dst rel
