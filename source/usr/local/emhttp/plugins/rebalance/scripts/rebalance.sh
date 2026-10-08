@@ -329,6 +329,16 @@ read_selection() {   # $RUN/selection.tsv -> SEL_ITEMS ("disk<TAB>rel"), SEL_DES
   (( ${#SEL_ITEMS[@]} )) || die "Bad selection: no item to move"
   (( ${#SEL_DESTS[@]} )) || die "Bad selection: no destination disk"
 }
+unit_conflict() {   # src dst rel -> 0 when moving rel would meet a file at the same path on dst, or a file where a folder is (or the reverse)
+  local s=$MNT/$1/$3 d=$MNT/$2/$3 t p
+  [[ -e $d || -L $d ]] || return 1
+  while IFS= read -r -d '' p; do
+    t=${p%% *}; p=${p#* }; p=$d${p:+/$p}
+    [[ -e $p || -L $p ]] || continue
+    [[ $t == d && -d $p && ! -L $p ]] || return 0   # a file (or link) meets anything, or a folder meets a non-folder
+  done < <(find "$s" -printf '%y %P\0' 2>/dev/null)
+  return 1
+}
 expand_units() {   # SEL_ITEMS -> $RUN/cand.units ("kib<TAB>path" NUL records, largest first). A whole disk, a share or a folder above ITEM_DEPTH splits into its items; a deeper folder or any file is one unit
   local a d rel share n dir
   for a in "${SEL_ITEMS[@]}"; do
@@ -352,7 +362,8 @@ expand_units() {   # SEL_ITEMS -> $RUN/cand.units ("kib<TAB>path" NUL records, l
   xargs -0 -r du -sk --null -- < "$RUN/cand.sel" 2>/dev/null | sort -z -t$'\t' -k1,1nr > "$RUN/cand.units"
 }
 plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Writes plan.tsv; exits itself on an empty or failed plan (D5)
-  local sz path d rel share r recv why bad=0
+  local sz path d rel share r recv why bad=0 item has rhas s
+  local -A planned_src   # "disk|item folder" -> source disks already planned onto that disk with that item folder
   plan_count=0; plan_kib=0; plan_skipped=0
   : > "$RUN/plan.tsv"
   read_selection
@@ -364,17 +375,29 @@ plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Wri
     if ! item_static_ok "$path" why; then
       log "PLAN-SKIP $(human "$sz")  $path  ($why)"; (( plan_skipped++ )); continue
     fi
-    recv=""
+    item=$(cut -d/ -f1-$(( ITEM_DEPTH + 1 )) <<< "$rel")   # the item folder (<share>/<item> at ITEM_DEPTH) this unit belongs to
+    recv=""; rhas=0
     for r in "${SEL_DESTS[@]}"; do
       [[ $r == "$d" ]] && continue                     # D3: never back to its own disk
       [[ -n ${FULL_SRC[$r]} ]] && continue             # D3: never onto a disk ticked in full
       (( AVAIL[$r] - sz < MIN_FREE_KB )) && continue   # the minimum free space floor
       share_allows "$share" "$r" || continue
-      if [[ -z $recv ]] || (( AVAIL[$r] > AVAIL[$recv] )); then recv=$r; fi   # D1: the most room
+      has=0; [[ -e $MNT/$r/$item || -n ${planned_src["$r|$item"]} ]] && has=1   # D2: prefer the disk that already holds the item folder
+      if [[ -z $recv ]] || (( has > rhas || (has == rhas && AVAIL[$r] > AVAIL[$recv]) )); then recv=$r; rhas=$has; fi   # D1: then the most room
     done
     if [[ -z $recv ]]; then
       log "PLAN-NOFIT $(human "$sz")  $path  (no ticked disk has room above the minimum free space)"; (( bad++ )); continue
     fi
+    why=""   # D2: merge, never overwrite - neither a file already on the destination nor one another ticked item brings there
+    if unit_conflict "$d" "$recv" "$rel"; then why="a file already exists at the same path on $recv"
+    else
+      for s in ${planned_src["$recv|$item"]}; do
+        [[ $s == "$d" ]] && continue
+        unit_conflict "$d" "$s" "$rel" && { why="$s also sends a file with the same path to $recv"; break; }
+      done
+    fi
+    [[ -n $why ]] && { log "PLAN-CONFLICT $(human "$sz")  $path -> $recv  ($why)"; (( bad++ )); }
+    planned_src["$recv|$item"]+="$d "
     (( plan_count++, plan_kib += sz ))
     printf '%s\t%s\t%s\t%s\t%s\n' "$plan_count" "$sz" "$d" "$recv" "$rel" >> "$RUN/plan.tsv"
     (( USED[$d] -= sz, AVAIL[$d] += sz, USED[$recv] += sz, AVAIL[$recv] -= sz ))
@@ -527,7 +550,8 @@ while IFS=$'\t' read -r idx sz src dst rel; do
   st_set cur_idx "$idx" cur_started "$EPOCHSECONDS" cur_cmd ""
   t0=$EPOCHSECONDS; reason=""
   if   [[ ! -e $MNT/$src/$rel ]]; then reason="source no longer exists"
-  elif [[ -e $MNT/$dst/$rel ]];   then reason="already exists on $dst"
+  elif $MOVE && unit_conflict "$src" "$dst" "$rel"; then reason="a file already exists at the same path on $dst"
+  elif ! $MOVE && [[ -e $MNT/$dst/$rel ]]; then reason="already exists on $dst"
   elif (( $(df_avail "$dst") - sz < MIN_FREE_KB )); then reason="not enough free space on $dst"
   else item_live_ok "$MNT/$src/$rel" reason
   fi

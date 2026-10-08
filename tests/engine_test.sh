@@ -258,6 +258,57 @@ check "the log lists the item that does not fit" 'grep -q "PLAN-NOFIT.*tv/Show A
 check "nothing moves when any item does not fit" '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" && ! -e "$T/mnt/disk2/movies/Movie One (2020)" ]]'
 check "a failed plan still writes the move script" '[[ -s $T/run/moves.sh ]]'
 
+echo "== data move: merge into a folder already on the destination"
+make_fixture
+mv "$T/mnt/disk2/tv/Show A (2001)/data.bin" "$T/mnt/disk2/tv/Show A (2001)/e02.bin"
+sel $'item\tdisk1\ttv/Show A (2001)' $'dest\tdisk2' $'dest\tdisk3'
+bash "$ENGINE" move-run; rc=$?
+check "a destination already holding the item folder is preferred over a roomier one" '[[ $(cut -f4 "$T/run/plan.tsv") == disk2 ]]'
+check "the item merges into the existing folder" '[[ $rc == 0 && $(st state) == done && -f "$T/mnt/disk2/tv/Show A (2001)/data.bin" && -f "$T/mnt/disk2/tv/Show A (2001)/e02.bin" && ! -e "$T/mnt/disk1/tv/Show A (2001)" ]]'
+
+echo "== data move: a same-named file on the destination"
+make_fixture
+sel $'item\tdisk1\ttv/Show A (2001)' $'dest\tdisk2'
+bash "$ENGINE" move-run; rc=$?
+check "a same-named file on the destination fails the plan" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-CONFLICT.*already exists at the same path on disk2" "$T/rb.log"'
+check "a conflict moves nothing and keeps both copies" '[[ $(stat -c %s "$T/mnt/disk1/tv/Show A (2001)/data.bin") == 614400 && $(stat -c %s "$T/mnt/disk2/tv/Show A (2001)/data.bin") == 40960 ]]'
+
+echo "== data move: a file on the destination where the source has a folder"
+make_fixture
+touch "$T/mnt/disk3/movies/Movie One (2020)"   # a file where the source has a folder
+sel $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "a file where the source has a folder is a conflict" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-CONFLICT" "$T/rb.log"'
+
+echo "== data move: two ticked folders bring the same file to one disk"
+make_fixture
+sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk2\ttv/Show A (2001)' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "two ticked folders that would bring the same file to one disk fail the plan" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-CONFLICT.*also sends a file with the same path" "$T/rb.log"'
+
+echo "== data move: gather a folder split across two disks"
+make_fixture
+mv "$T/mnt/disk2/tv/Show A (2001)/data.bin" "$T/mnt/disk2/tv/Show A (2001)/e02.bin"
+touch -h -d '2 hours ago' "$T/mnt/disk2/tv/Show A (2001)"   # the rename touched the folder; age it like the fixture
+sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk2\ttv/Show A (2001)' $'dest\tdisk3'
+bash "$ENGINE" move-run; rc=$?
+check "a folder split across two disks gathers on one" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 2 && -f "$T/mnt/disk3/tv/Show A (2001)/data.bin" && -f "$T/mnt/disk3/tv/Show A (2001)/e02.bin" && ! -e "$T/mnt/disk1/tv/Show A (2001)" && ! -e "$T/mnt/disk2/tv/Show A (2001)" ]]'
+
+echo "== data move: a conflict that appears after planning"
+make_fixture
+mkdir -p "$T/late"
+cat > "$T/late/rsync" <<EOF
+#!/bin/bash
+# while the first move copies, a file appears where the second item is headed
+mkdir -p "$T/mnt/disk3/movies/Movie One (2020)" && echo late > "$T/mnt/disk3/movies/Movie One (2020)/data.bin"
+exec "$REAL_RSYNC" "\$@"
+EOF
+chmod +x "$T/late/rsync"
+sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk3'
+PATH=$T/late:$PATH bash "$ENGINE" move-run; rc=$?
+check "a conflict that appears after planning is skipped live" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 1 && $(st skipped) == 1 ]] && grep -q "SKIP.*Movie One (2020).*a file already exists" "$T/rb.log"'
+check "a live-skipped item keeps both copies" '[[ $(cat "$T/mnt/disk3/movies/Movie One (2020)/data.bin") == late && -s "$T/mnt/disk1/movies/Movie One (2020)/data.bin" ]]'
+
 echo "== pause / resume / stop"
 make_fixture extra
 mkdir -p "$T/slow"
