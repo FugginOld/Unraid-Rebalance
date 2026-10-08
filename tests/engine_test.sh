@@ -209,6 +209,53 @@ bash "$ENGINE" move-plan; rc=$?
 check "selection refused: an item inside another item" '[[ $rc == 1 && $(st msg) == "Bad selection: disk1/movies/Movie One (2020) is inside disk1/movies" ]]'
 check "a refused selection moves nothing" '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" && ! -e "$T/mnt/disk3/movies/Movie One (2020)" ]]'
 
+echo "== data move: a folder"
+make_fixture
+sel $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk3'
+bash "$ENGINE" move-run; rc=$?
+check "move-run of a folder ends done in mode move-run" '[[ $rc == 0 && $(st state) == done && $(st mode) == move-run ]]'
+check "the folder lands at the same path on the destination" '[[ -f "$T/mnt/disk3/movies/Movie One (2020)/data.bin" ]]'
+check "the folder is gone from the source" '[[ ! -e "$T/mnt/disk1/movies/Movie One (2020)" ]]'
+check "the log names the run a data move" 'grep -q "Data Move - mode: move-run" "$T/rb.log"'
+
+echo "== data move: a single file"
+make_fixture
+sel $'item\tdisk1\tmovies/Movie One (2020)/data.bin' $'dest\tdisk3'
+bash "$ENGINE" move-run; rc=$?
+check "a single file moves to the same path" '[[ $rc == 0 && $(st state) == done && -f "$T/mnt/disk3/movies/Movie One (2020)/data.bin" && ! -e "$T/mnt/disk1/movies/Movie One (2020)/data.bin" ]]'
+
+echo "== data move: a whole share spreads over two destinations"
+make_fixture
+rm -rf "$T/mnt/disk2/tv"; echo 3000 > "$T/sizes/disk3"   # disk3 has more room for the first item only
+sel $'item\tdisk1\ttv' $'dest\tdisk2' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+want=$(printf 'disk1\tdisk3\ttv/Show A (2001)\ndisk1\tdisk2\ttv/Show B')
+check "a whole share expands to its items, largest first to the most room" '[[ $rc == 0 && $(st state) == planned && $(cut -f3- "$T/run/plan.tsv") == "$want" ]]'
+check "a move dry run moves nothing" '[[ -d "$T/mnt/disk1/tv/Show A (2001)" && ! -e "$T/mnt/disk3/tv/Show A (2001)" ]]'
+
+echo "== data move: never back to its own disk"
+make_fixture
+sel $'item\tdisk3\ttv/Show C' $'dest\tdisk2' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "an item never goes back to its own disk" '[[ $rc == 0 && $(cut -f3,4 "$T/run/plan.tsv") == "$(printf "disk3\tdisk2")" ]]'
+
+echo "== data move: a disk ticked in full never receives"
+make_fixture
+echo 2500 > "$T/sizes/disk3"   # disk2 would have more room than disk3
+sel $'item\tdisk2\t' $'item\tdisk1\ttv/Show B' $'dest\tdisk2' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "a disk ticked in full never receives" '[[ $rc == 0 && $(st state) == planned && $(st plan_count) == 3 ]] && ! awk -F"\t" "\$4 == \"disk2\" { f=1 } END { exit !f }" "$T/run/plan.tsv"'
+
+echo "== data move: an item that does not fit fails the plan"
+make_fixture
+echo 1000 > "$T/sizes/disk2"   # room for Movie One (404) but not Show A (604)
+sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk2'
+bash "$ENGINE" move-run; rc=$?
+check "an item that does not fit fails the plan with an error" '[[ $rc == 1 && $(st state) == error && $(st msg) == "1 item(s) cannot be moved"* ]]'
+check "the log lists the item that does not fit" 'grep -q "PLAN-NOFIT.*tv/Show A (2001)" "$T/rb.log"'
+check "nothing moves when any item does not fit" '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" && ! -e "$T/mnt/disk2/movies/Movie One (2020)" ]]'
+check "a failed plan still writes the move script" '[[ -s $T/run/moves.sh ]]'
+
 echo "== pause / resume / stop"
 make_fixture extra
 mkdir -p "$T/slow"

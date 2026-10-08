@@ -242,14 +242,16 @@ report() {
   done
 }
 
+item_paths() {   # dir depth -> NUL-separated paths exactly depth levels below dir; hidden names and paths with a newline or tab never appear
+  find "$1" -mindepth "$2" -maxdepth "$2" ! -name '.*' ! -path $'*\n*' ! -path $'*\t*' -print0
+}
 build_candidates() {  # disk -> "sizeKiB<TAB>path" NUL records, largest first
   local d=$1 dir share
   for dir in "$MNT/$d"/*/; do
     [[ -d $dir ]] || continue
     share=${dir%/}; share=${share##*/}
     share_eligible "$share" || continue
-    find "$MNT/$d/$share" -mindepth "$ITEM_DEPTH" -maxdepth "$ITEM_DEPTH" ! -name '.*' ! -path $'*\n*' ! -path $'*\t*' -print0 \
-      | xargs -0 -r du -sk --null -- 2>/dev/null
+    item_paths "$MNT/$d/$share" "$ITEM_DEPTH" | xargs -0 -r du -sk --null -- 2>/dev/null
   done | sort -z -t$'\t' -k1,1nr > "$RUN/cand.$d"
 }
 
@@ -327,9 +329,72 @@ read_selection() {   # $RUN/selection.tsv -> SEL_ITEMS ("disk<TAB>rel"), SEL_DES
   (( ${#SEL_ITEMS[@]} )) || die "Bad selection: no item to move"
   (( ${#SEL_DESTS[@]} )) || die "Bad selection: no destination disk"
 }
-plan_move() {   # Data Move planner - validation only in this task; Task 4 replaces this function
+expand_units() {   # SEL_ITEMS -> $RUN/cand.units ("kib<TAB>path" NUL records, largest first). A whole disk, a share or a folder above ITEM_DEPTH splits into its items; a deeper folder or any file is one unit
+  local a d rel share n dir
+  for a in "${SEL_ITEMS[@]}"; do
+    d=${a%%$'\t'*}; rel=${a#*$'\t'}; share=${rel%%/*}
+    if [[ -n $share ]] && ! share_eligible "$share"; then
+      log "PLAN-SKIP  $MNT/$d/$rel  (share excluded in settings)" >&2; (( plan_skipped++ )); continue
+    fi
+    n=${rel//[!\/]/}; n=$(( ${#n} + 1 )); [[ -z $rel ]] && n=0   # path depth: 0 = the whole disk, 1 = a share
+    if (( n == 0 )); then
+      for dir in "$MNT/$d"/*/; do
+        [[ -d $dir ]] || continue
+        share=${dir%/}; share=${share##*/}
+        share_eligible "$share" && item_paths "$MNT/$d/$share" "$ITEM_DEPTH"
+      done
+    elif (( n <= ITEM_DEPTH )) && [[ -d $MNT/$d/$rel && ! -L $MNT/$d/$rel ]]; then
+      item_paths "$MNT/$d/$rel" $(( ITEM_DEPTH + 1 - n ))
+    else
+      printf '%s\0' "$MNT/$d/$rel"   # one unit as it is
+    fi
+  done > "$RUN/cand.sel"
+  xargs -0 -r du -sk --null -- < "$RUN/cand.sel" 2>/dev/null | sort -z -t$'\t' -k1,1nr > "$RUN/cand.units"
+}
+plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Writes plan.tsv; exits itself on an empty or failed plan (D5)
+  local sz path d rel share r recv why bad=0
+  plan_count=0; plan_kib=0; plan_skipped=0
+  : > "$RUN/plan.tsv"
   read_selection
-  die "Data Move planning is not built yet"
+  log "Scanning the selection (depth $ITEM_DEPTH)"
+  expand_units
+  while IFS=$'\t' read -r -d '' sz path; do
+    d=${path#"$MNT/"}; d=${d%%/*}; rel=${path#"$MNT/$d/"}; share=${rel%%/*}
+    why=""
+    if ! item_static_ok "$path" why; then
+      log "PLAN-SKIP $(human "$sz")  $path  ($why)"; (( plan_skipped++ )); continue
+    fi
+    recv=""
+    for r in "${SEL_DESTS[@]}"; do
+      [[ $r == "$d" ]] && continue                     # D3: never back to its own disk
+      [[ -n ${FULL_SRC[$r]} ]] && continue             # D3: never onto a disk ticked in full
+      (( AVAIL[$r] - sz < MIN_FREE_KB )) && continue   # the minimum free space floor
+      share_allows "$share" "$r" || continue
+      if [[ -z $recv ]] || (( AVAIL[$r] > AVAIL[$recv] )); then recv=$r; fi   # D1: the most room
+    done
+    if [[ -z $recv ]]; then
+      log "PLAN-NOFIT $(human "$sz")  $path  (no ticked disk has room above the minimum free space)"; (( bad++ )); continue
+    fi
+    (( plan_count++, plan_kib += sz ))
+    printf '%s\t%s\t%s\t%s\t%s\n' "$plan_count" "$sz" "$d" "$recv" "$rel" >> "$RUN/plan.tsv"
+    (( USED[$d] -= sz, AVAIL[$d] += sz, USED[$recv] += sz, AVAIL[$recv] -= sz ))
+    log "PLAN $plan_count  $(human "$sz")  $path  ->  $recv"
+    st_set plan_count "$plan_count" plan_kib "$plan_kib" plan_skipped "$plan_skipped"
+  done < "$RUN/cand.units"
+  rm -f "$RUN"/cand.*
+  st_set plan_count "$plan_count" plan_kib "$plan_kib" plan_skipped "$plan_skipped"
+  report "PROJECTED AFTER"
+  summary="$plan_count move(s), $(human "$plan_kib") planned; $plan_skipped item(s) left out (in-progress, hardlinked or excluded share)"
+  log "Plan: $summary"
+  if (( bad )); then   # D5: nothing moves while any ticked item cannot be placed
+    write_move_script   # the move script shows what would have moved
+    die "$bad item(s) cannot be moved - they don't fit above the minimum free space or would overwrite a file. Nothing was moved; see the log"
+  fi
+  if (( plan_count == 0 )); then
+    msg="Nothing can be moved - $plan_skipped item(s) left out (in-progress, hardlinked or excluded share), see log"
+    (( plan_skipped )) || msg="Nothing to move - the ticked items hold nothing to move"
+    FINAL=done; st_set state done warn 1 msg "$msg"; notify warning "$msg"; exit 0
+  fi
 }
 
 ############################## MAIN ##############################
