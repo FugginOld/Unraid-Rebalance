@@ -1,0 +1,245 @@
+Menu="ArrayRebalance:2"
+Title="Data Move"
+Icon="balance-scale"
+Tag="balance-scale"
+Markdown="false"
+---
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/plugins/rebalance/include/common.css">
+
+<div class="rb" id="dm">
+  <div class="head">
+    <div>
+      <div class="eyebrow"><?=htmlspecialchars(strtoupper($var['NAME'] ?? 'UNRAID'))?> · UNRAID ARRAY</div>
+      <div class="title-row"><h1>Data Move</h1><span class="pill" id="dm-pill"><i></i><span>Loading</span></span><a class="pill localURL" id="dm-moves-pill" href="#dm-moves" hidden>View move script</a></div>
+      <div class="muted" id="dm-meta">&nbsp;</div>
+    </div>
+    <div class="actions" id="dm-actions"></div>
+  </div>
+
+  <div class="msg" id="dm-msg"></div>
+  <div class="chips" id="dm-chips"></div>
+
+  <div class="row">
+    <section class="card" style="flex:1.3 1 0">
+      <h2 class="label" id="dm-ov-label">Overall progress</h2>
+      <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+        <div class="big" id="dm-pct">-</div>
+        <div class="soft" id="dm-pct-sub" style="font-size:16px"></div>
+      </div>
+      <div class="bar"><div id="dm-bar" style="width:0"></div></div>
+      <div class="stats">
+        <div class="stat"><div class="k">Moves</div><div class="v" id="dm-s-moves">-</div></div>
+        <div class="stat"><div class="k" id="dm-k-skip">Skipped (busy / linked)</div><div class="v" id="dm-s-skip">-</div></div>
+        <div class="stat"><div class="k" id="dm-k-avg">Average rate</div><div class="v" id="dm-s-avg">-</div></div>
+        <div class="stat"><div class="k" id="dm-k-eta">Finish (at current rate)</div><div class="v" id="dm-s-eta">-</div></div>
+      </div>
+    </section>
+    <section class="card" style="flex:1 1 0" id="dm-current"></section>
+  </div>
+
+  <div class="row">
+    <section class="card" style="flex:1 1 0">
+      <div class="cardhead"><h2 class="h2">Up next</h2><span class="muted" id="dm-q-meta" style="font-size:13px"></span></div>
+      <div class="list" id="dm-queue"></div>
+    </section>
+    <section class="card" style="flex:1 1 0">
+      <div class="cardhead"><h2 class="h2">Recently completed</h2><span class="muted" id="dm-h-meta" style="font-size:13px"></span></div>
+      <div class="list" id="dm-hist"></div>
+    </section>
+  </div>
+
+  <div class="row panes">
+    <section class="card pane">
+      <div class="cardhead">
+        <div><h2 class="h2">Source</h2><div class="muted" style="font-size:13px">Tick a whole disk, a folder, or individual files.</div></div>
+        <div class="pane-tools"><button type="button" class="lnk" id="dm-src-collapse">Collapse all</button><button type="button" class="lnk" id="dm-src-clear">Clear</button></div>
+      </div>
+      <div class="legend"><span><i class="sw" style="background:var(--grey)"></i>Used</span><span><i class="sw out"></i>Ticked to move out</span></div>
+      <div class="lock" id="dm-src-lock" hidden>The selection is locked while the move runs.</div>
+      <div class="scroller" id="dm-tree"></div>
+      <div class="foot" id="dm-src-foot"></div>
+    </section>
+    <section class="card pane">
+      <div class="cardhead"><div><h2 class="h2">Destination</h2><div class="muted" style="font-size:13px">Tick one or more disks to receive it.</div></div></div>
+      <div class="legend"><span><i class="sw" style="background:var(--grey)"></i>Used</span><span><i class="sw in"></i>Incoming</span><span><i style="height:14px;border-left:2px dashed var(--mark)"></i>Minimum free space</span></div>
+      <div class="lock" id="dm-dst-lock" hidden>Destinations are locked while the move runs.</div>
+      <label class="selall" for="dm-dst-allcb"><input type="checkbox" id="dm-dst-allcb"><span>Select all disks</span><span class="muted" id="dm-dst-allnote"></span></label>
+      <div class="scroller" id="dm-dests"></div>
+      <div class="foot" id="dm-dst-foot"></div>
+    </section>
+  </div>
+
+  <section class="logbox">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="label">Log</h2><span style="display:flex;gap:16px;flex-wrap:wrap"><a id="dm-script" href="/plugins/rebalance/include/script.php" target="_blank" rel="noopener" hidden>View move script</a><a href="/plugins/rebalance/include/log.php">Download full log</a></span></div>
+    <div class="loglines" id="dm-log"></div>
+  </section>
+
+  <section class="logbox" id="dm-moves" hidden>
+    <h2 class="label">Move script</h2>
+    <div class="loglines" id="dm-moves-text"></div>
+  </section>
+
+  <div class="muted" style="font-size:13px">Data Move uses the settings on the <a href="#" id="dm-settings-link">Array Rebalance tab</a>: minimum free space, item depth, share and disk exclusions, safety checks, turbo write and notifications.</div>
+</div>
+
+<script src="/plugins/rebalance/include/common.js"></script>
+<script>
+(function () {
+  var el = RB.el, fmtKiB = RB.fmtKiB, fmtDur = RB.fmtDur, KI = RB.KI, GI = RB.GI, TI = RB.TI;
+  var RATE = 100e6;   // bytes/s behind the selection's duration estimate: a typical disk-to-disk move
+  var $ = function (id) { return document.getElementById('dm-' + id); };
+  var S = null, DEST = {}, dirty = false, R;   // S: last status as this tab sees it; dirty: ticks changed since the last dry run
+
+  function cfgInt(k, dflt) { var v = parseInt(S.cfg[k], 10); return isNaN(v) ? dflt : v; }
+  function depth() { return Math.max(1, cfgInt('ITEM_DEPTH', 1)); }
+  function minFree() { return cfgInt('MIN_FREE_GB', 50) * GI; }   // KiB, the engine's MIN_FREE_KB
+  function disks() { return S.disks.filter(function (x) { return !x.excluded; }); }
+
+  /* ---------- source tree ---------- */
+  var TREE = null;
+  function picked() { return []; }
+  function units() { return []; }
+  function loaded() { return null; }
+  function renderTree() {}
+  /* ---------- end source tree ---------- */
+
+  function itemOf(rel) { return rel.split('/').slice(0, depth() + 1).join('/'); }   // the item folder at Item depth
+  function fullDisks() { var f = {}; picked().forEach(function (n) { if (n.depth === 0) f[n.disk] = 1; }); return f; }
+  function destNames() {
+    var f = fullDisks();
+    return disks().filter(function (x) { return DEST[x.name] && !f[x.name]; }).map(function (x) { return x.name; });
+  }
+
+  // the engine's placement, previewed: largest first; a disk already holding the item folder, else the most room (D1-D3)
+  function plan() {
+    var us = units(), MIN = minFree(), full = fullDisks();
+    var room = {}, incoming = {}, outgoing = {}, srcs = {}, at = {}, moves = [], unfit = [];
+    disks().forEach(function (x) { room[x.name] = x.avail - MIN; incoming[x.name] = 0; outgoing[x.name] = 0; });
+    us.forEach(function (u) { outgoing[u.n.disk] += u.n.kib; srcs[u.n.disk] = 1; });
+    var dests = disks().filter(function (x) { return DEST[x.name] && !full[x.name]; });
+    us.forEach(function (u) {
+      var n = u.n, item = itemOf(n.rel), best = null, bestHas = false;
+      dests.forEach(function (x) {
+        if (x.name === n.disk || room[x.name] < n.kib) return;
+        var has = !!at[x.name + '|' + item] || !!loaded(x.name, item);
+        if (!best || has > bestHas || (has === bestHas && room[x.name] > room[best])) { best = x.name; bestHas = has; }
+      });
+      if (!best) { unfit.push(n); return; }
+      room[best] -= n.kib; room[n.disk] += n.kib; incoming[best] += n.kib; at[best + '|' + item] = 1;
+      moves.push({ title: n.name, src: n.disk, dst: best, kib: n.kib, share: n.rel.split('/')[0], merge: bestHas });
+    });
+    return { units: us, srcs: srcs, full: full, dests: dests, moves: moves, unfit: unfit, incoming: incoming, outgoing: outgoing,
+      approx: us.some(function (u) { return u.approx; }),
+      kib: moves.reduce(function (t, m) { return t + m.kib; }, 0), unfitKiB: unfit.reduce(function (t, n) { return t + n.kib; }, 0) };
+  }
+
+  function listItem(m) {
+    var it = el('div', 'item'), l = el('div'); l.style.minWidth = '0';
+    l.append(el('div', 't ellip', m.title), el('div', 'r', m.src + ' \u2192 ' + m.dst + (m.share ? ' \u00b7 ' + m.share : '') + (m.merge ? ' \u00b7 merges into existing folder' : '')));
+    var sz = el('div', 'mono soft', fmtKiB(m.kib)); sz.style.cssText = 'font-size:13px;white-space:nowrap';
+    it.append(l, sz); return it;
+  }
+
+  function renderDests(P, locked) {
+    var box = $('dests'), top = box.scrollTop, MIN = minFree(); box.textContent = '';
+    var ax = el('div', 'xrow axis');
+    ['', 'DISK', 'SIZE', 'USED \u2192 AFTER', 'AFTER', 'INCOMING'].forEach(function (t, i) {
+      var s = el('span', i === 2 ? 'dsz' : null, t); if (i === 2 || i >= 4) s.style.textAlign = 'right'; ax.append(s);
+    });
+    box.append(ax);
+    disks().forEach(function (x) {
+      var src = !!P.full[x.name], on = !!DEST[x.name] && !src, inc = P.incoming[x.name] || 0;
+      var row = el('div', 'xrow' + (on ? ' on' : '') + (src ? ' src' : ''));
+      var cb = el('input'); cb.type = 'checkbox'; cb.id = 'dm-dst-' + x.name; cb.checked = on; cb.disabled = src || locked;
+      cb.setAttribute('aria-label', 'Move to ' + x.name);
+      cb.addEventListener('change', function () { DEST[x.name] = cb.checked; dirty = true; R.refresh(); });
+      var nm = el('label', 'mono', x.name); nm.htmlFor = cb.id; nm.style.fontSize = '14px';
+      var sz = el('div', 'muted dsz', (x.size / TI).toFixed(1) + ' TiB'); sz.style.cssText = 'font-size:12px;text-align:right';
+      var tr = el('div', 'xtrack'), u = el('i', 'used'); u.style.width = (x.used / x.size * 100) + '%'; tr.append(u);
+      if (inc) { var i = el('i', 'in'); i.style.left = (x.used / x.size * 100) + '%'; i.style.width = (inc / x.size * 100) + '%'; tr.append(i); }
+      var lim = el('i'); lim.style.cssText = 'left:' + (Math.max(0, x.size - MIN) / x.size * 100) + '%;top:-3px;bottom:-3px;border-left:2px dashed var(--mark);border-radius:0'; tr.append(lim);
+      var after = el('div', 'num', ((x.used + inc) / x.size * 100).toFixed(1) + '%');
+      var dl = el('div', 'num delta' + (inc ? ' i' : ''), src ? '' : inc ? '+' + fmtKiB(inc) : on ? '\u2014' : '');
+      if (src) dl.append(el('span', 'tag', 'source'));
+      if (on && !inc) dl.style.color = 'var(--muted)';
+      row.append(cb, nm, sz, tr, after, dl);
+      box.append(row);
+    });
+    box.scrollTop = top;
+    $('dst-lock').hidden = !locked;
+    var avail = disks().filter(function (x) { return !P.full[x.name]; }), nOn = avail.filter(function (x) { return DEST[x.name]; }).length, all = $('dst-allcb');
+    all.checked = avail.length > 0 && nOn === avail.length; all.indeterminate = nOn > 0 && nOn < avail.length; all.disabled = locked || !avail.length;
+    $('dst-allnote').textContent = nOn + ' of ' + avail.length + ' available';
+    var free = P.dests.reduce(function (t, x) { return t + Math.max(0, x.avail - MIN); }, 0);
+    var f = $('dst-foot'); f.textContent = '';
+    var l = el('span'); l.append(el('b', null, String(P.dests.length)), document.createTextNode(' disk' + (P.dests.length === 1 ? '' : 's') + ' ticked'));
+    var r = el('span'); r.append(el('b', null, fmtKiB(free)), document.createTextNode(' usable above the ' + (MIN / GI) + ' GB floor'));
+    f.append(l, r);
+  }
+
+  function renderSelection(o, P) {   // Selecting: the cards show the ticked selection and a live preview of the plan
+    var n = P.units.length;
+    if (!o.other && o.state !== 'error' && o.state !== 'stale') {
+      if (n && !P.dests.length) R.setMsg('Tick at least one destination disk.', 'warn');
+      else if (P.unfit.length) R.setMsg(P.unfit.length + ' item' + (P.unfit.length === 1 ? '' : 's') + ' (' + fmtKiB(P.unfitKiB) + ') won\u2019t fit on the ticked destinations above the minimum free space.' + (P.approx ? ' Some ticked folders are not expanded yet, so this is a rough preview - the dry run is exact.' : ''), 'warn');
+      else if (!n && !o.msg) R.setMsg('Tick what to move in Source, then where it goes in Destination.');
+    }
+    $('ov-label').textContent = 'Selection';
+    $('pct').textContent = n ? fmtKiB(P.kib + P.unfitKiB) : '-';
+    $('pct-sub').textContent = n ? 'in ' + n + ' item' + (n === 1 ? '' : 's') + ', not started' : 'Nothing ticked yet';
+    $('bar').style.width = '0';
+    $('s-moves').textContent = P.moves.length ? String(P.moves.length) : '-';
+    $('k-skip').textContent = 'Won\u2019t fit'; $('s-skip').textContent = n ? String(P.unfit.length) : '-';
+    $('s-skip').style.color = P.unfit.length ? 'var(--amber-t)' : '';
+    $('k-avg').textContent = 'Destinations'; $('s-avg').textContent = String(P.dests.length);
+    $('k-eta').textContent = 'Est. duration (at 100 MB/s)'; $('s-eta').textContent = P.kib ? '\u2248 ' + fmtDur(P.kib * KI / RATE) : '-';
+    var q = $('queue'); q.textContent = '';
+    $('q-meta').textContent = P.moves.length ? P.moves.length + ' items \u00b7 ' + fmtKiB(P.kib) + ' \u00b7 preview' : '';
+    if (!P.moves.length) q.append(el('div', 'empty', 'Tick items and a destination to see the plan.'));
+    P.moves.slice(0, 6).forEach(function (m) { q.append(listItem(m)); });
+    if (P.moves.length > 6) q.append(el('div', 'empty', '+ ' + (P.moves.length - 6) + ' more'));
+  }
+  function activeLabels() {   // a run or a dry-run plan: the cards read exactly as on the Rebalance tab
+    $('ov-label').textContent = 'Overall progress';
+    $('k-skip').textContent = 'Skipped (busy / linked)'; $('s-skip').style.color = '';
+    $('k-avg').textContent = 'Average rate';
+    $('k-eta').textContent = 'Finish (at current rate)';
+  }
+
+  function render(o) {
+    S = o;
+    var locked = RB.ACTIVE.indexOf(o.state) >= 0, P = plan();
+    renderTree(P, locked); renderDests(P, locked);
+    if (!locked && (o.state !== 'planned' || dirty)) renderSelection(o, P); else activeLabels();
+  }
+
+  $('dst-allcb').addEventListener('change', function () {
+    if (!S) return;
+    var on = this.checked, full = fullDisks();
+    disks().forEach(function (x) { if (!full[x.name]) DEST[x.name] = on; });
+    dirty = true; R.refresh();
+  });
+  $('settings-link').addEventListener('click', function (e) {
+    e.preventDefault();
+    var t = document.getElementById('tab1');
+    if (t) t.click(); else document.getElementById('rb').scrollIntoView();
+  });
+
+  R = RB.dashboard('dm', {
+    csrf: "<?=$var['csrf_token']?>", move: true,
+    otherName: 'Array Rebalance', otherTab: 'tab1', otherRoot: 'rb', otherBusy: 'A rebalance is running.',
+    ask: { 'move-run': 'Start moving the ticked items now? The plan is rebuilt from the current disk usage first, and nothing moves if any item doesn\u2019t fit or would overwrite a file.' },
+    idle: function () {
+      var ok = !!S && picked().length > 0 && destNames().length > 0;
+      return [['Dry run', 'move-plan', '', !ok], ['Start move', 'move-run', 'primary', !ok]];
+    },
+    extra: function (action) {
+      if (action !== 'move-plan' && action !== 'move-run') return null;
+      dirty = false;
+      return { items: JSON.stringify(picked().map(function (n) { return { disk: n.disk, rel: n.rel }; })), dests: JSON.stringify(destNames()) };
+    },
+    render: render
+  });
+})();
+</script>

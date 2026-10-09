@@ -16,7 +16,7 @@ An Unraid plugin that rebalances array data so every data disk is filled to the 
 https://raw.githubusercontent.com/FugginOld/Unraid-Rebalance/main/rebalance.plg
 ```
 
-Then open **Settings → User Utilities → Array Rebalance**. Start with **Dry run**.
+Then open **Settings → User Utilities → Array Rebalance**. Start with **Dry run**. The **Data Move** tab moves ticked disks, folders or files to the disks you tick, keeping their paths.
 
 ## How it works
 
@@ -50,15 +50,21 @@ rebalance.plg                         plugin manifest (version + md5 patched by 
 icon.png                              icon used by the Community Applications listing
 build.sh                              builds releases/rebalance-<ver>-x86_64-1.txz (local test builds)
 tests/engine_test.sh                  integration tests against a fake array (run by CI)
+tests/syntax.sh                       bash / PHP / plg / JavaScript syntax checks (run by CI)
 .github/workflows/test.yml            syntax checks + integration tests on push / PR
 .github/workflows/release.yml         tag -> test -> build -> patch plg -> GitHub release
 source/usr/local/emhttp/plugins/rebalance/
-  Rebalance.page                      dashboard + settings (Settings -> User Utilities)
+  ArrayRebalance.page                 tabbed parent page (Settings -> User Utilities -> Array Rebalance)
+  Rebalance.page                      tab 1: rebalance dashboard + settings
+  DataMove.page                       tab 2: Data Move (ticked items -> ticked disks, same paths)
   default.cfg                         defaults; user settings in /boot/config/plugins/rebalance/rebalance.cfg
-  scripts/rebalance.sh                engine: plan / run
+  scripts/rebalance.sh                engine: plan / run / move-plan / move-run
   scripts/rebalance-ctl               start / pause / resume / stop / abort
+  include/common.css, common.js       styles and dashboard code shared by both tabs
+  include/common.php                  helpers shared by the endpoints
   include/status.php                  JSON for the dashboard (GET)
-  include/action.php                  controls + settings save (POST, CSRF-checked by the webGui)
+  include/browse.php                  one folder of an array disk, for the Data Move tree (GET)
+  include/action.php                  controls, Data Move selection, settings save (POST, CSRF-checked by the webGui)
   include/log.php                     log download
 ```
 
