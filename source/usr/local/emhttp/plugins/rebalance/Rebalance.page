@@ -1,113 +1,11 @@
-Menu="Utilities"
+Menu="ArrayRebalance:1"
 Title="Array Rebalance"
 Icon="balance-scale"
 Tag="balance-scale"
 Markdown="false"
 ---
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<style>
-.rb{--bg:var(--background-color,#121417);--panel:var(--mild-background-color,#1b1e22);--deep:var(--shade-bg-color,#0e1012);--line:var(--table-border-color,#2a2e33);--track:#262a2f;--edge:var(--border-color,#3a3f45);--btn:var(--mild-background-color,#1f2226);--chip:#23272c;--text:var(--text-color,#e8e6e1);--soft:var(--text-color,#c9c6bf);--muted:#9aa1a9;
-  --amber:#f0a13a;--amber-t:#ffb85c;--blue:#4f9cf0;--blue-t:#8cc2ff;--grey:#6f7780;--green:#5fd184;--green-t:#93e2ab;--red:#b4473f;--red-t:#ff9b91;--brand:#f0a13a;--brand-t:#ffb85c;
-  --hov:var(--table-border-color,#2a2e33);--hov-t:#e8e6e1;--mark:#e8e6e1;--tick:#c9c6bf;--field:var(--input-border-color,#6f7780);--ok-bg:#1c3124;--warn-bg:#35280f;--info-bg:#142840;--bad-bg:#3a1a17;--bad-hov:#2a1513;
-  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
-  background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;border-radius:14px;padding:28px 32px;
-  display:flex;flex-direction:column;gap:22px;box-sizing:border-box;margin:10px 0 30px}
-.Theme--white .rb,.Theme--azure .rb{--bg:var(--background-color,#f2f2f2);--panel:var(--mild-background-color,#f7f9f9);--deep:var(--shade-bg-color,#e8e8e8);--line:var(--table-border-color,#d3d3d3);--edge:var(--border-color,#d3d3d3);--btn:var(--mild-background-color,#f7f9f9);--text:var(--text-color,#1d1b1b);--soft:var(--text-color,#1d1b1b);--field:var(--input-border-color,#1d1b1b);
-  --track:#dde1e6;--chip:#dde1e6;--hov:#dde1e6;--hov-t:#1d1b1b;--mark:#1d1b1b;--tick:#4a5058;--muted:#5b626b;--amber:#955a00;--amber-t:#7a4800;--blue:#2b6cc4;--blue-t:#1d5aa8;--green:#2e8a4e;--green-t:#1e6b3a;--red-t:#a3322a;
-  --ok-bg:#d9efe0;--warn-bg:#f6e3c4;--info-bg:#d8e6f8;--bad-bg:#f7dcd8;--bad-hov:#f7dcd8}
-.rb *{box-sizing:border-box}
-.rb h1,.rb h2{margin:0;color:var(--text);font-weight:600;text-transform:none;letter-spacing:normal}
-.rb .muted{color:var(--muted)} .rb .soft{color:var(--soft)} .rb .mono{font-family:var(--mono)}
-.rb .head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
-.rb .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--muted)}
-.rb .title-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0}
-.rb h1{font-family:var(--cond);font-size:38px;line-height:1.1}
-.rb .pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600;background:var(--chip);color:var(--soft)}
-.rb .pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
-.rb .pill.ok{background:var(--ok-bg);color:var(--green-t)} .rb .pill.warn{background:var(--warn-bg);color:var(--amber-t)}
-.rb .pill.info{background:var(--info-bg);color:var(--blue-t)} .rb .pill.bad{background:var(--bad-bg);color:var(--red-t)}
-.rb .actions{display:flex;gap:10px;flex-wrap:wrap}
-.rb .rb-btn{height:44px!important;padding:0 18px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--edge)!important;
-  background:var(--btn)!important;color:var(--text)!important;font:500 14px var(--sans)!important;text-transform:none!important;letter-spacing:normal!important;cursor:pointer;min-width:0!important;
-  transition:background-color .15s,border-color .15s,transform .1s}
-.rb .rb-btn:hover{background:var(--hov)!important;color:var(--hov-t)!important}
-.rb .rb-btn.primary{background:var(--brand)!important;border-color:var(--brand)!important;color:#1a1204!important}
-.rb .rb-btn.primary:hover{background:var(--brand-t)!important}
-.rb .rb-btn.danger{background:transparent!important;border-color:var(--red)!important;color:var(--red-t)!important}
-.rb .rb-btn.danger:hover{background:var(--bad-hov)!important}
-.rb .rb-btn:disabled{opacity:.5;cursor:default}
-.rb .rb-btn:active:not(:disabled){transform:translateY(1px)}
-.rb .rb-btn:focus-visible,.rb summary:focus-visible,.rb a:focus-visible,.rb .check input:focus-visible{outline:2px solid var(--amber-t)!important;outline-offset:2px}
-.rb summary:focus-visible{outline-offset:-2px}
-.rb .field input[type=text]:focus,.rb .field input[type=number]:focus{border-color:var(--amber)!important;box-shadow:0 0 0 1px var(--amber);outline:2px solid transparent!important}
-@media (prefers-reduced-motion:reduce){.rb *{transition:none!important}}
-.rb .msg{padding:12px 16px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--soft)}
-.rb .msg.bad{border-color:var(--red);color:var(--red-t)} .rb .msg.warn{border-color:var(--amber);color:var(--amber-t)} .rb .msg:empty{display:none}
-.rb .chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-.rb .chip{display:flex;flex-direction:column;gap:3px;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
-.rb .chip .k{font-size:12px;color:var(--muted)} .rb .chip .v{font-size:15px;font-weight:600} .rb .chip .s{font-size:12px;color:var(--muted);font-family:var(--mono)}
-.rb .row{display:flex;gap:22px;align-items:flex-start}
-.rb .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:14px;min-width:0}
-.rb .label{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
-.rb .h2{font-family:var(--cond);font-size:22px}
-.rb .big{font-family:var(--cond);font-size:60px;font-weight:600;line-height:1}
-.rb .bar{height:12px;background:var(--track);border-radius:6px;overflow:hidden}
-.rb .bar>div{height:100%;background:var(--amber);border-radius:6px;transition:width .6s ease}
-.rb .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.rb .stat .k{font-size:12px;color:var(--muted)} .rb .stat .v{font-family:var(--mono);font-size:18px}
-.rb .route{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;flex-wrap:wrap}
-.rb .cmd{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}
-.rb .dtag{padding:3px 10px;border-radius:6px;border:1px solid}
-.rb .dtag.from{border-color:var(--amber);color:var(--amber-t)} .rb .dtag.to{border-color:var(--blue);color:var(--blue-t)}
-.rb .cur-title{font-family:var(--cond);font-size:28px;font-weight:600;line-height:1.15;word-break:break-word}
-.rb .spread{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:14px}
-.rb .ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rb .legend{display:flex;gap:14px;font-size:12px;color:var(--soft);flex-wrap:wrap;justify-content:flex-end}
-.rb .legend span{display:inline-flex;align-items:center;gap:6px}
-.rb .sw{width:12px;height:12px;border-radius:2px;display:inline-block}
-.rb .dgrid{display:grid;grid-template-columns:64px 64px minmax(0,1fr) 64px 100px;gap:12px;align-items:center}
-.rb .axis{font-size:11px;color:var(--muted);font-family:var(--mono)}
-.rb .axis .scale{position:relative;height:14px}
-.rb .axis .scale span{position:absolute;transform:translateX(-50%)}
-.rb .drow{height:26px} .rb .drow.excl{opacity:.45}
-.rb .track{position:relative;height:14px;background:var(--track);border-radius:3px}
-.rb .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .6s ease}
-.rb .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tick)}
-.rb .tline{position:absolute;top:-5px;bottom:-5px;border-left:2px dashed var(--mark)}
-.rb .num{font-family:var(--mono);font-size:13px;text-align:right}
-.rb .list .item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
-.rb .list .item .t{font-size:14px;font-weight:500} .rb .list .item .r{font-family:var(--mono);font-size:12px;color:var(--muted)}
-.rb .list .empty{color:var(--muted);padding:10px 0;border-top:1px solid var(--line)}
-.rb .ico{flex:none}
-.rb .logbox{background:var(--deep);border:1px solid var(--line);border-radius:12px;padding:18px 22px;display:flex;flex-direction:column;gap:10px}
-.rb .loglines{font-family:var(--mono);font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;gap:4px;overflow-x:auto}
-.rb .loglines div{white-space:pre}
-.rb .loglines .skip{color:var(--amber-t)} .rb .loglines .err{color:var(--red-t)} .rb .loglines .mv{color:var(--text)}
-.rb [hidden]{display:none!important}
-.rb a.pill{text-decoration:none} .rb a.pill:hover{color:var(--text)}
-.rb #rb-moves{scroll-margin-top:80px} .rb #rb-moves .loglines{max-height:420px;overflow-y:auto}
-.rb a{color:var(--amber)} .rb a:hover{color:var(--amber-t)}
-.rb details{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0 24px}
-.rb summary{cursor:pointer;padding:18px 0;font-family:var(--cond);font-size:20px;font-weight:600;list-style-position:inside}
-.rb .form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 24px;padding:4px 0 22px}
-.rb .field{display:flex;flex-direction:column;gap:6px}
-.rb .field label{font-size:13px;color:var(--soft);font-weight:500}
-.rb .field .hint{font-size:12px;color:var(--muted)}
-.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--field)!important;
-  background:var(--deep)!important;color:var(--text)!important;font:14px var(--mono)!important;width:100%!important;max-width:none!important}
-.rb .field.wide{grid-column:span 2}
-.rb .check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--soft);min-height:40px}
-.rb .check input{width:18px;height:18px;margin:0;accent-color:var(--amber)}
-.rb .form-actions{grid-column:1/-1;display:flex;align-items:center;gap:14px}
-@media (max-width:1100px){.rb .chips{grid-template-columns:repeat(2,minmax(0,1fr))}.rb .row{flex-direction:column}.rb .row>*{width:100%}.rb .form{grid-template-columns:1fr}.rb .field.wide{grid-column:auto}}
-@media (max-width:640px){.rb{padding:20px 16px}.rb h1{font-size:28px}.rb .big{font-size:44px}.rb .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .rb .card{padding:18px 14px}.rb .num{font-size:12px}.rb .drow>div:first-child{font-size:12px}
-  .rb .dgrid{grid-template-columns:44px minmax(0,1fr) 52px 66px;gap:6px}.rb .dsize{display:none}
-  .rb .scale span:not(:first-child):not(:last-child){display:none}
-  .rb .list .item{flex-wrap:wrap;row-gap:4px}.rb .list .item>div:last-child{text-align:left!important}
-  .rb #rb-hist .item>div:last-child{padding-left:26px}
-  .rb .list .item .ellip{white-space:normal}.rb .legend{justify-content:flex-start}}
-</style>
+<link rel="stylesheet" href="/plugins/rebalance/include/common.css">
 
 <div class="rb" id="rb">
   <div class="head">
@@ -211,163 +109,12 @@ Markdown="false"
   </details>
 </div>
 
+<script src="/plugins/rebalance/include/common.js"></script>
 <script>
 (function () {
-  var CSRF = "<?=$var['csrf_token']?>";
-  var BASE = '/plugins/rebalance/include/';
-  var movesKey = null;   // started time of the dry run whose script is shown
-  var KI = 1024, GI = 1024 * 1024, TI = GI * 1024;
+  var el = RB.el, TI = RB.TI, fmtSigned = RB.fmtSigned;
   var $ = function (id) { return document.getElementById(id); };
-  var formLoaded = false, busy = false, last = null;
-
-  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  function fmtKiB(k) { k = Math.max(0, k || 0); return k >= TI ? (k / TI).toFixed(2) + ' TiB' : k >= GI ? (k / GI).toFixed(1) + ' GiB' : (k / KI).toFixed(0) + ' MiB'; }
-  function fmtSigned(k) { return (k >= 0 ? '+' : '\u2212') + Math.abs(Math.round(k / GI)) + ' GiB'; }
-  function fmtRate(b) { return b > 0 ? (b / 1e6).toFixed(0) + ' MB/s' : '-'; }
-  function fmtDur(s) {
-    s = Math.max(0, Math.round(s)); var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
-    return d ? d + 'd ' + h + 'h ' + m + 'm' : h ? h + 'h ' + m + 'm' : m ? m + ' min' : s + ' s';
-  }
-  function activeSecs(d) { return d.now - d.started - (d.paused_s || 0); }
-  function fmtTime(t) { return new Date(t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
-  function svg(path, color) {
-    var ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg'), p = document.createElementNS(ns, 'path');
-    s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('fill', 'none');
-    s.style.stroke = color; s.setAttribute('stroke-width', '1.8'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('aria-hidden', 'true');
-    s.setAttribute('class', 'ico'); p.setAttribute('d', path); s.appendChild(p); return s;
-  }
-
-  var STATES = {
-    idle: ['Idle', ''], planning: ['Planning', 'warn'], planned: ['Dry run ready', 'info'], running: ['Running', 'ok'],
-    paused: ['Paused', 'warn'], stopped: ['Stopped', ''], done: ['Done', 'ok'], aborted: ['Aborted', 'bad'],
-    error: ['Error', 'bad'], stale: ['Engine not running', 'bad']
-  };
-
-  function post(action, extra) {
-    var body = new URLSearchParams(Object.assign({ action: action, csrf_token: CSRF }, extra || {}));
-    busy = true;
-    return fetch(BASE + 'action.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
-      .then(function (r) { return r.json(); })
-      .catch(function () { return { ok: false, msg: 'Request failed - reload the page and try again' }; })
-      .then(function (j) { busy = false; poll(); return j; });
-  }
-
-  function act(action) {
-    var ask = {
-      run: 'Start moving data now? The plan is rebuilt from the current disk usage first. Moves are disk-to-disk and parity stays valid throughout.',
-      abort: 'Abort immediately? The item being moved right now will be left split across two disks. It stays readable through the user share, but won\u2019t be tidied up automatically.',
-      stop: 'Stop after the current move finishes?'
-    }[action];
-    if (ask && !confirm(ask)) return;
-    post(action).then(function (j) { if (!j.ok) setMsg(j.msg, 'bad'); });
-  }
-
-  function button(label, action, cls) {
-    var b = el('button', 'rb-btn' + (cls ? ' ' + cls : ''), label); b.type = 'button';
-    b.addEventListener('click', function () { act(action); }); return b;
-  }
-
-  function setMsg(text, cls) { var m = $('rb-msg'); m.textContent = text || ''; m.className = 'msg' + (cls ? ' ' + cls : ''); }
-
-  function renderHead(d) {
-    var s = STATES[d.state] || [d.state, ''];
-    var warn = d.state === 'done' && d.warn;   // "Nothing can be moved": done, but a disk is still over target
-    var label = s[0];
-    if (d.state === 'paused' && d.pause_reason && d.pause_reason !== 'user') label = 'Paused \u00b7 ' + d.pause_reason;
-    var pending = d.request === 'stop' || (d.request === 'pause' && d.state === 'running') ? d.request : '';
-    if (pending) label += ' \u00b7 ' + (pending === 'pause' ? 'pausing' : 'stopping') + (d.state === 'running' ? ' after this move' : '');
-    var pill = $('rb-pill'); pill.className = 'pill ' + (warn ? 'warn' : s[1]); pill.lastChild.textContent = label;
-
-    var meta = [];
-    var active = ['planning', 'running', 'paused'].indexOf(d.state) >= 0;
-    if (d.started) {
-      meta.push((active ? 'Started ' : 'Last run started ') + fmtTime(d.started));
-      if (active) meta.push('Elapsed ' + fmtDur(activeSecs(d)) + (d.paused_s ? ' (+' + fmtDur(d.paused_s) + ' paused)' : ''));
-    } else meta.push('No run yet');
-    if (d.updated && active) meta.push('Updated ' + fmtDur(d.now - d.updated) + ' ago');
-    $('rb-meta').textContent = meta.join(' \u00b7 ');
-
-    var a = $('rb-actions'); a.textContent = '';
-    if (d.state === 'running') {
-      // 'resume' overwrites the pending control word, so it doubles as cancel
-      if (pending === 'pause') a.append(button('Cancel pause', 'resume'), button('Stop after this move', 'stop'));
-      else if (pending === 'stop') a.append(button('Cancel stop', 'resume'));
-      else a.append(button('Pause after this move', 'pause'), button('Stop after this move', 'stop'));
-      a.append(button('Abort now', 'abort', 'danger'));
-    } else if (d.state === 'paused') {
-      if (d.pause_reason === 'user') a.append(button('Resume', 'resume', 'primary'));
-      if (pending !== 'stop') a.append(button('Stop', 'stop'));
-      a.append(button('Abort now', 'abort', 'danger'));
-    } else if (d.state === 'planning') {
-      a.append(button('Abort', 'abort', 'danger'));
-    } else {
-      a.append(button('Dry run', 'plan'), button('Start rebalance', 'run', 'primary'));
-    }
-    if (d.state === 'error' || d.state === 'stale') setMsg(d.msg || 'The engine stopped unexpectedly - check the log.', 'bad');
-    else setMsg(d.msg || '', warn ? 'warn' : '');
-  }
-
-  function chip(k, v, s) {
-    var c = el('div', 'chip'); c.append(el('div', 'k', k), el('div', 'v', v)); if (s) c.append(el('div', 's', s)); return c;
-  }
-  function renderChips(d) {
-    var A = d.array, wm = { '0': 'Read/modify/write', '1': 'Reconstruct \u00b7 turbo', 'auto': 'Auto' }[A.write_method] || (A.write_method || 'Unknown');
-    var safety = d.cfg.SKIP_OPEN_FILES === 'true' || d.cfg.SKIP_HARDLINKED === 'true';
-    var c = $('rb-chips'); c.textContent = '';
-    c.append(
-      chip('Array', A.state === 'STARTED' ? 'Started' : A.state),
-      chip('Parity check', A.parity ? 'Running' : 'Idle'),
-      chip('Mover', A.mover ? 'Running' : 'Idle'),
-      chip('Write method', wm, A.observed ? 'observed: ' + A.observed : null),
-      chip('Live-safety checks', (safety ? 'On' : 'Off') + (A.docker ? ' \u00b7 Docker running' : ''))
-    );
-  }
-
-  function renderOverall(d) {
-    var total = d.plan.kib, cur = d.current, moved = d.done.kib + (cur ? cur.bytes / 1024 : 0);
-    moved = Math.min(moved, total);
-    var pct = total ? moved / total * 100 : 0;
-    if (!d.plan.count) {
-      $('rb-pct').textContent = '-';
-      $('rb-pct-sub').textContent = d.state === 'planning' ? 'Building the plan\u2026'
-        : d.state === 'done' ? (d.warn ? 'Nothing can be moved' : 'Nothing to move') : 'Run a dry run to see what would move';
-    } else if (d.state === 'planned') {
-      $('rb-pct').textContent = fmtKiB(total);
-      $('rb-pct-sub').textContent = 'planned across ' + d.plan.count + ' moves (dry run)';
-    } else {
-      $('rb-pct').textContent = pct.toFixed(1) + '%';
-      $('rb-pct-sub').textContent = fmtKiB(moved) + ' of ' + fmtKiB(total) + ' moved';
-    }
-    $('rb-bar').style.width = (d.state === 'planned' ? 0 : pct).toFixed(2) + '%';
-    $('rb-s-moves').textContent = d.plan.count ? d.done.count + ' / ' + d.plan.count : '-';
-    $('rb-s-skip').textContent = d.plan.count || d.plan.left_out ? String(d.done.skipped + d.plan.left_out) : '-';
-    var running = ['running', 'paused'].indexOf(d.state) >= 0;
-    var avg = running && d.started && activeSecs(d) > 0 ? moved * 1024 / activeSecs(d) : 0;
-    $('rb-s-avg').textContent = avg ? fmtRate(avg) : '-';
-    var rate = cur && cur.rate ? cur.rate : avg;
-    $('rb-s-eta').textContent = running && rate ? '\u2248 ' + fmtDur((total - moved) * 1024 / rate) : '-';
-  }
-
-  function renderCurrent(d) {
-    var box = $('rb-current'), c = d.current; box.textContent = '';
-    if (!c) {
-      box.append(el('h2', 'label', 'Now moving'));
-      var t = d.state === 'paused' ? 'Paused \u00b7 ' + (d.pause_reason === 'user' ? 'waiting for Resume' : 'waiting for the ' + d.pause_reason + ' to finish')
-            : d.state === 'planning' ? 'Scanning disks and building the plan\u2026' : 'Nothing is moving right now.';
-      box.append(el('div', 'muted', t)); return;
-    }
-    box.append(el('h2', 'label', 'Now moving \u00b7 item ' + c.idx + ' of ' + d.plan.count));
-    box.append(el('div', 'cur-title', c.title));
-    var r = el('div', 'route'); r.append(el('span', 'dtag from', c.src), svg('M1 8h13M10 4l4 4-4 4', 'var(--muted)'), el('span', 'dtag to', c.dst), el('span', 'muted', c.share + ' share'));
-    box.append(r);
-    if (c.cmd) box.append(el('div', 'cmd', c.cmd));   // exact rsync command, text only
-    var bar = el('div', 'bar'); var f = el('div'); f.style.width = (c.pct || 0) + '%'; bar.append(f); box.append(bar);
-    var left = c.rate ? ' \u00b7 ' + fmtDur(Math.max(0, c.kib * 1024 - c.bytes) / c.rate) + ' left' : '';
-    var sp = el('div', 'spread'); sp.append(el('span', null, fmtKiB(c.bytes / 1024) + ' of ' + fmtKiB(c.kib)), el('span', 'soft', fmtRate(c.rate) + left));
-    box.append(sp);
-    var file = c.file ? c.file.replace(c.rel + '/', '') : 'Preparing\u2026';
-    var fe = el('div', 'mono muted ellip', file); fe.style.fontSize = '12px'; fe.title = file; box.append(fe);
-  }
+  var formLoaded = false, R;
 
   function renderDisks(d) {
     var T = d.target_pct, tol = d.tol_pct, rows = d.disks;
@@ -408,49 +155,6 @@ Markdown="false"
     });
   }
 
-  function renderLists(d) {
-    $('rb-q-meta').textContent = d.queue_count ? d.queue_count + ' items \u00b7 ' + fmtKiB(d.queue_kib) : '';
-    var q = $('rb-queue'); q.textContent = '';
-    if (!d.queue.length) q.append(el('div', 'empty', d.plan.count ? 'Nothing left in the plan.' : 'No plan yet.'));
-    d.queue.forEach(function (p) {
-      var it = el('div', 'item'), l = el('div'); l.style.minWidth = '0';
-      l.append(el('div', 't ellip', p.title), el('div', 'r', p.src + ' \u2192 ' + p.dst));
-      var sz = el('div', 'mono soft', fmtKiB(p.kib)); sz.style.cssText = 'font-size:13px;white-space:nowrap';
-      it.append(l, sz); q.append(it);
-    });
-
-    $('rb-h-meta').textContent = d.done.count || d.done.skipped ? d.done.count + ' done' + (d.done.skipped ? ' \u00b7 ' + d.done.skipped + ' skipped' : '') : '';
-    var h = $('rb-hist'); h.textContent = '';
-    if (!d.history.length) h.append(el('div', 'empty', 'Nothing yet.'));
-    d.history.forEach(function (x) {
-      var it = el('div', 'item'), l = el('div'); l.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:0';
-      var icon = x.result === 'done' ? svg('M3 8.5l3.2 3L13 4.5', 'var(--green)') : x.result === 'skip' ? svg('M4 8h8', 'var(--amber-t)') : svg('M4 4l8 8M12 4l-8 8', 'var(--red-t)');
-      var txt = el('div'); txt.style.minWidth = '0';
-      txt.append(el('div', 't ellip', x.title), el('div', 'r', x.src + ' \u2192 ' + x.dst + (x.result !== 'done' ? ' \u00b7 ' + x.reason : '')));
-      l.append(icon, txt);
-      var stat = x.result === 'done' ? fmtKiB(x.kib) + ' \u00b7 ' + fmtDur(x.secs) + (x.secs ? ' \u00b7 ' + fmtRate(x.kib * 1024 / x.secs) : '') : x.result === 'skip' ? 'skipped' : 'failed';
-      var s = el('div', 'mono soft', stat); s.style.cssText = 'font-size:12px;white-space:nowrap;text-align:right';
-      it.append(l, s); h.append(it);
-    });
-  }
-
-  function renderLog(d) {
-    var ready = d.plan.count > 0 && d.state === 'planned';
-    $('rb-script').hidden = $('rb-moves-pill').hidden = $('rb-moves').hidden = !ready;
-    if (ready && movesKey !== d.started) {   // fetch the script once per dry run, not on every poll
-      movesKey = d.started;
-      fetch(BASE + 'script.php', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw r.status; return r.text(); })
-        .then(function (t) { var m = $('rb-moves-text'); m.textContent = ''; m.append(el('div', '', t)); })
-        .catch(function () { movesKey = null; });
-    }
-    var box = $('rb-log'); box.textContent = '';
-    if (!d.log.length) { box.append(el('div', 'muted', 'No log yet.')); return; }
-    d.log.forEach(function (line) {
-      var cls = /\bSKIP\b|PAUSED|WARNING/.test(line) ? 'skip' : /ERROR|ABORT/.test(line) ? 'err' : /\bMOVE\b/.test(line) ? 'mv' : '';
-      box.append(el('div', cls, line));
-    });
-  }
-
   function loadForm(cfg) {
     var f = $('rb-form');
     Object.keys(cfg).forEach(function (k) {
@@ -459,30 +163,21 @@ Markdown="false"
     });
     formLoaded = true;
   }
+
+  R = RB.dashboard('rb', {
+    csrf: "<?=$var['csrf_token']?>", move: false,
+    otherName: 'Data Move', otherTab: 'tab2', otherRoot: 'dm', otherBusy: 'A data move is running.',
+    ask: { run: 'Start moving data now? The plan is rebuilt from the current disk usage first. Moves are disk-to-disk and parity stays valid throughout.' },
+    idle: function () { return [['Dry run', 'plan'], ['Start rebalance', 'run', 'primary']]; },
+    render: function (d) { renderDisks(d); if (!formLoaded) loadForm(d.cfg); }
+  });
   $('rb-save').addEventListener('click', function () {
     var f = $('rb-form'), data = {};
     Array.prototype.forEach.call(f.elements, function (i) {
       if (!i.name) return; data[i.name] = i.type === 'checkbox' ? (i.checked ? 'true' : 'false') : i.value;
     });
     $('rb-save-msg').textContent = 'Saving\u2026';
-    post('save', data).then(function (j) { $('rb-save-msg').textContent = j.msg; $('rb-save-msg').style.color = j.ok ? '' : 'var(--red-t)'; });
+    R.post('save', data).then(function (j) { $('rb-save-msg').textContent = j.msg; $('rb-save-msg').style.color = j.ok ? '' : 'var(--red-t)'; });
   });
-
-  function render(d) {
-    last = d;
-    renderHead(d); renderChips(d); renderOverall(d); renderCurrent(d); renderDisks(d); renderLists(d); renderLog(d);
-    if (!formLoaded) loadForm(d.cfg);
-  }
-
-  function poll() {
-    if (document.hidden && last) return;
-    fetch(BASE + 'status.php', { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(render)
-      .catch(function () { setMsg('Could not reach the status endpoint - retrying', 'bad'); });
-  }
-  poll();
-  setInterval(function () { if (!busy) poll(); }, 3000);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
 })();
 </script>

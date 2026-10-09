@@ -1,0 +1,147 @@
+/* Array Rebalance - styles shared by the Array Rebalance and Data Move tabs */
+.rb{--bg:var(--background-color,#121417);--panel:var(--mild-background-color,#1b1e22);--deep:var(--shade-bg-color,#0e1012);--line:var(--table-border-color,#2a2e33);--track:#262a2f;--edge:var(--border-color,#3a3f45);--btn:var(--mild-background-color,#1f2226);--chip:#23272c;--text:var(--text-color,#e8e6e1);--soft:var(--text-color,#c9c6bf);--muted:#9aa1a9;
+  --amber:#f0a13a;--amber-t:#ffb85c;--blue:#4f9cf0;--blue-t:#8cc2ff;--grey:#6f7780;--green:#5fd184;--green-t:#93e2ab;--red:#b4473f;--red-t:#ff9b91;--brand:#f0a13a;--brand-t:#ffb85c;
+  --hov:var(--table-border-color,#2a2e33);--hov-t:#e8e6e1;--mark:#e8e6e1;--tick:#c9c6bf;--field:var(--input-border-color,#6f7780);--ok-bg:#1c3124;--warn-bg:#35280f;--info-bg:#142840;--bad-bg:#3a1a17;--bad-hov:#2a1513;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;border-radius:14px;padding:28px 32px;
+  display:flex;flex-direction:column;gap:22px;box-sizing:border-box;margin:10px 0 30px}
+.Theme--white .rb,.Theme--azure .rb{--bg:var(--background-color,#f2f2f2);--panel:var(--mild-background-color,#f7f9f9);--deep:var(--shade-bg-color,#e8e8e8);--line:var(--table-border-color,#d3d3d3);--edge:var(--border-color,#d3d3d3);--btn:var(--mild-background-color,#f7f9f9);--text:var(--text-color,#1d1b1b);--soft:var(--text-color,#1d1b1b);--field:var(--input-border-color,#1d1b1b);
+  --track:#dde1e6;--chip:#dde1e6;--hov:#dde1e6;--hov-t:#1d1b1b;--mark:#1d1b1b;--tick:#4a5058;--muted:#5b626b;--amber:#955a00;--amber-t:#7a4800;--blue:#2b6cc4;--blue-t:#1d5aa8;--green:#2e8a4e;--green-t:#1e6b3a;--red-t:#a3322a;
+  --ok-bg:#d9efe0;--warn-bg:#f6e3c4;--info-bg:#d8e6f8;--bad-bg:#f7dcd8;--bad-hov:#f7dcd8}
+.rb *{box-sizing:border-box}
+.rb h1,.rb h2{margin:0;color:var(--text);font-weight:600;text-transform:none;letter-spacing:normal}
+.rb .muted{color:var(--muted)} .rb .soft{color:var(--soft)} .rb .mono{font-family:var(--mono)}
+.rb .head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.rb .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--muted)}
+.rb .title-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0}
+.rb h1{font-family:var(--cond);font-size:38px;line-height:1.1}
+.rb .pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600;background:var(--chip);color:var(--soft)}
+.rb .pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+.rb .pill.ok{background:var(--ok-bg);color:var(--green-t)} .rb .pill.warn{background:var(--warn-bg);color:var(--amber-t)}
+.rb .pill.info{background:var(--info-bg);color:var(--blue-t)} .rb .pill.bad{background:var(--bad-bg);color:var(--red-t)}
+.rb .actions{display:flex;gap:10px;flex-wrap:wrap}
+.rb .rb-btn{height:44px!important;padding:0 18px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--edge)!important;
+  background:var(--btn)!important;color:var(--text)!important;font:500 14px var(--sans)!important;text-transform:none!important;letter-spacing:normal!important;cursor:pointer;min-width:0!important;
+  transition:background-color .15s,border-color .15s,transform .1s}
+.rb .rb-btn:hover{background:var(--hov)!important;color:var(--hov-t)!important}
+.rb .rb-btn.primary{background:var(--brand)!important;border-color:var(--brand)!important;color:#1a1204!important}
+.rb .rb-btn.primary:hover{background:var(--brand-t)!important}
+.rb .rb-btn.danger{background:transparent!important;border-color:var(--red)!important;color:var(--red-t)!important}
+.rb .rb-btn.danger:hover{background:var(--bad-hov)!important}
+.rb .rb-btn:disabled{opacity:.5;cursor:default}
+.rb .rb-btn:active:not(:disabled){transform:translateY(1px)}
+.rb .rb-btn:focus-visible,.rb summary:focus-visible,.rb a:focus-visible,.rb .check input:focus-visible{outline:2px solid var(--amber-t)!important;outline-offset:2px}
+.rb summary:focus-visible{outline-offset:-2px}
+.rb .field input[type=text]:focus,.rb .field input[type=number]:focus{border-color:var(--amber)!important;box-shadow:0 0 0 1px var(--amber);outline:2px solid transparent!important}
+@media (prefers-reduced-motion:reduce){.rb *{transition:none!important}}
+.rb .msg{padding:12px 16px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--soft)}
+.rb .msg.bad{border-color:var(--red);color:var(--red-t)} .rb .msg.warn{border-color:var(--amber);color:var(--amber-t)} .rb .msg:empty{display:none}
+.rb .chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.rb .chip{display:flex;flex-direction:column;gap:3px;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.rb .chip .k{font-size:12px;color:var(--muted)} .rb .chip .v{font-size:15px;font-weight:600} .rb .chip .s{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.rb .row{display:flex;gap:22px;align-items:flex-start}
+.rb .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.rb .label{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.rb .h2{font-family:var(--cond);font-size:22px}
+.rb .big{font-family:var(--cond);font-size:60px;font-weight:600;line-height:1}
+.rb .bar{height:12px;background:var(--track);border-radius:6px;overflow:hidden}
+.rb .bar>div{height:100%;background:var(--amber);border-radius:6px;transition:width .6s ease}
+.rb .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.rb .stat .k{font-size:12px;color:var(--muted)} .rb .stat .v{font-family:var(--mono);font-size:18px}
+.rb .route{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;flex-wrap:wrap}
+.rb .cmd{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}
+.rb .dtag{padding:3px 10px;border-radius:6px;border:1px solid}
+.rb .dtag.from{border-color:var(--amber);color:var(--amber-t)} .rb .dtag.to{border-color:var(--blue);color:var(--blue-t)}
+.rb .cur-title{font-family:var(--cond);font-size:28px;font-weight:600;line-height:1.15;word-break:break-word}
+.rb .spread{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:14px}
+.rb .ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb .legend{display:flex;gap:14px;font-size:12px;color:var(--soft);flex-wrap:wrap;justify-content:flex-end}
+.rb .legend span{display:inline-flex;align-items:center;gap:6px}
+.rb .sw{width:12px;height:12px;border-radius:2px;display:inline-block}
+.rb .dgrid{display:grid;grid-template-columns:64px 64px minmax(0,1fr) 64px 100px;gap:12px;align-items:center}
+.rb .axis{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.rb .axis .scale{position:relative;height:14px}
+.rb .axis .scale span{position:absolute;transform:translateX(-50%)}
+.rb .drow{height:26px} .rb .drow.excl{opacity:.45}
+.rb .track{position:relative;height:14px;background:var(--track);border-radius:3px}
+.rb .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .6s ease}
+.rb .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tick)}
+.rb .tline{position:absolute;top:-5px;bottom:-5px;border-left:2px dashed var(--mark)}
+.rb .num{font-family:var(--mono);font-size:13px;text-align:right}
+.rb .list .item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.rb .list .item .t{font-size:14px;font-weight:500} .rb .list .item .r{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.rb .list .empty{color:var(--muted);padding:10px 0;border-top:1px solid var(--line)}
+.rb .ico{flex:none}
+.rb .logbox{background:var(--deep);border:1px solid var(--line);border-radius:12px;padding:18px 22px;display:flex;flex-direction:column;gap:10px}
+.rb .loglines{font-family:var(--mono);font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;gap:4px;overflow-x:auto}
+.rb .loglines div{white-space:pre}
+.rb .loglines .skip{color:var(--amber-t)} .rb .loglines .err{color:var(--red-t)} .rb .loglines .mv{color:var(--text)}
+.rb [hidden]{display:none!important}
+.rb a.pill{text-decoration:none} .rb a.pill:hover{color:var(--text)}
+.rb #rb-moves,.rb #dm-moves{scroll-margin-top:80px} .rb #rb-moves .loglines,.rb #dm-moves .loglines{max-height:420px;overflow-y:auto}
+.rb a{color:var(--amber)} .rb a:hover{color:var(--amber-t)}
+.rb details{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0 24px}
+.rb summary{cursor:pointer;padding:18px 0;font-family:var(--cond);font-size:20px;font-weight:600;list-style-position:inside}
+.rb .form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 24px;padding:4px 0 22px}
+.rb .field{display:flex;flex-direction:column;gap:6px}
+.rb .field label{font-size:13px;color:var(--soft);font-weight:500}
+.rb .field .hint{font-size:12px;color:var(--muted)}
+.rb .field input[type=text],.rb .field input[type=number]{height:40px!important;padding:0 12px!important;margin:0!important;border-radius:8px!important;border:1px solid var(--field)!important;
+  background:var(--deep)!important;color:var(--text)!important;font:14px var(--mono)!important;width:100%!important;max-width:none!important}
+.rb .field.wide{grid-column:span 2}
+.rb .check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--soft);min-height:40px}
+.rb .check input{width:18px;height:18px;margin:0;accent-color:var(--amber)}
+.rb .form-actions{grid-column:1/-1;display:flex;align-items:center;gap:14px}
+@media (max-width:1100px){.rb .chips{grid-template-columns:repeat(2,minmax(0,1fr))}.rb .row{flex-direction:column}.rb .row>*{width:100%}.rb .form{grid-template-columns:1fr}.rb .field.wide{grid-column:auto}}
+@media (max-width:640px){.rb{padding:20px 16px}.rb h1{font-size:28px}.rb .big{font-size:44px}.rb .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rb .card{padding:18px 14px}.rb .num{font-size:12px}.rb .drow>div:first-child{font-size:12px}
+  .rb .dgrid{grid-template-columns:44px minmax(0,1fr) 52px 66px;gap:6px}.rb .dsize{display:none}
+  .rb .scale span:not(:first-child):not(:last-child){display:none}
+  .rb .list .item{flex-wrap:wrap;row-gap:4px}.rb .list .item>div:last-child{text-align:left!important}
+  .rb #rb-hist .item>div:last-child,.rb #dm-hist .item>div:last-child{padding-left:26px}
+  .rb .list .item .ellip{white-space:normal}.rb .legend{justify-content:flex-start}}
+
+/* ---------- Data Move: Source and Destination panes ---------- */
+.rb .row.panes{align-items:stretch}
+.rb .cardhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.rb .pane{flex:1 1 0}
+.rb .pane .legend{justify-content:flex-start}
+.rb .pane-tools{display:flex;gap:16px;align-items:center}
+.rb .lnk{background:none;border:0;padding:0;color:var(--amber);font:500 13px var(--sans);cursor:pointer}
+.rb .lnk:hover{color:var(--amber-t)} .rb .lnk:disabled{color:var(--muted);cursor:default}
+.rb .scroller{max-height:600px;overflow:auto;border-top:1px solid var(--line);margin:0 -24px;padding:0 24px}
+.rb .trow{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:10px;align-items:center;min-height:32px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.rb .trow.on,.rb .xrow.on{background:var(--hov);margin:0 -24px;padding:0 24px}
+.rb .tlead{display:flex;align-items:center;gap:8px;min-width:0}
+.rb .chev{width:22px;height:22px;flex:none;display:inline-grid;place-items:center;background:none;border:0;border-radius:4px;color:var(--muted);cursor:pointer;padding:0}
+.rb .chev:hover{background:var(--hov);color:var(--text)}
+.rb .chev svg{transition:transform .15s} .rb .chev[aria-expanded="true"] svg{transform:rotate(90deg)}
+.rb .chev.blank{visibility:hidden}
+#dm .pane input[type=checkbox],#dm .selall input[type=checkbox]{width:16px;height:16px;margin:0;flex:none;accent-color:var(--amber);cursor:pointer}
+#dm .pane input[type=checkbox]:disabled{cursor:default}
+.rb .tname{min-width:0;font-size:13.5px}
+.rb .tname.dir::after{content:'/';color:var(--muted)}
+.rb .tname.file{color:var(--soft)}
+.rb .tsize{font-family:var(--mono);font-size:12.5px;color:var(--muted);text-align:right;white-space:nowrap}
+.rb .dname{font-family:var(--mono);font-size:14px;width:58px;flex:none}
+.rb .mini{position:relative;height:8px;background:var(--track);border-radius:3px;flex:1 1 auto;min-width:40px;max-width:180px}
+.rb .mini>i,.rb .xtrack>i{position:absolute;top:0;bottom:0;border-radius:3px}
+.rb .used{background:var(--grey);left:0}
+.rb .out{background:repeating-linear-gradient(-45deg,var(--amber) 0 4px,var(--amber-t) 4px 7px)}
+.rb .in{background:repeating-linear-gradient(-45deg,var(--blue) 0 4px,var(--blue-t) 4px 7px)}
+.rb .delta{font-family:var(--mono);font-size:12px;white-space:nowrap}
+.rb .delta.o{color:var(--amber-t)} .rb .delta.i{color:var(--blue-t)}
+.rb .xrow{display:grid;grid-template-columns:16px 58px 52px minmax(0,1fr) 58px 84px;gap:10px;align-items:center;min-height:32px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.rb .xrow.src{opacity:.55}
+.rb .xrow .num{font-size:12.5px}
+.rb .xrow.axis{border-bottom:0;min-height:22px}
+.rb .xtrack{position:relative;height:12px;background:var(--track);border-radius:3px}
+.rb .tag{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;border:1px solid var(--amber);color:var(--amber-t)}
+.rb .foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--soft)}
+.rb .foot b{font-family:var(--mono);font-weight:500;color:var(--text)}
+.rb .selall{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;cursor:pointer;padding:8px 12px;border:1px solid var(--edge);border-radius:8px;background:var(--btn)}
+.rb .selall:hover{background:var(--hov)} .rb .selall .muted{font-size:13px;font-weight:400;margin-left:auto}
+.rb .selall:has(input:disabled){cursor:default;opacity:.6}
+.rb .lock{font-size:13px;color:var(--blue-t);background:var(--info-bg);padding:8px 12px;border-radius:8px}
+@media (max-width:640px){.rb .scroller{margin:0 -14px;padding:0 14px}.rb .trow.on,.rb .xrow.on{margin:0 -14px;padding:0 14px}
+  .rb .xrow{grid-template-columns:16px 52px minmax(0,1fr) 52px 70px;gap:6px}.rb .dsz{display:none}.rb .mini{display:none}}
