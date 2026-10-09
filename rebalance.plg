@@ -5,7 +5,7 @@
 <!ENTITY repo      "Unraid-Rebalance">
 <!ENTITY version   "2026.09.28">
 <!ENTITY md5       "1e7dc552556c7af14963ae4dde132c03">
-<!ENTITY launch    "Settings/ArrayRebalance">
+<!ENTITY launch    "Settings/Rebalance">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/&repo;/main/&name;.plg">
 <!ENTITY pkg       "&name;-&version;-x86_64-1">
 <!ENTITY pkgURL    "https://github.com/&author;/&repo;/releases/download/&version;/&pkg;.txz">

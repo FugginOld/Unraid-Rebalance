@@ -54,8 +54,8 @@ tests/syntax.sh                       bash / PHP / plg / JavaScript syntax check
 .github/workflows/test.yml            syntax checks + integration tests on push / PR
 .github/workflows/release.yml         tag -> test -> build -> patch plg -> GitHub release
 source/usr/local/emhttp/plugins/rebalance/
-  ArrayRebalance.page                 tabbed parent page (Settings -> User Utilities -> Array Rebalance)
-  Rebalance.page                      tab 1: rebalance dashboard + settings
+  Rebalance.page                      tabbed parent page (Settings -> User Utilities -> Array Rebalance)
+  RebalanceMain.page                  tab 1: rebalance dashboard + settings
   DataMove.page                       tab 2: Data Move (ticked items -> ticked disks, same paths)
   default.cfg                         defaults; user settings in /boot/config/plugins/rebalance/rebalance.cfg
   scripts/rebalance.sh                engine: plan / run / move-plan / move-run

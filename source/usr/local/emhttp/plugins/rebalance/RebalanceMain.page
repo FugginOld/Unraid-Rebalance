@@ -1,0 +1,183 @@
+Menu="Rebalance:1"
+Title="Array Rebalance"
+Icon="balance-scale"
+Tag="balance-scale"
+Markdown="false"
+---
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/plugins/rebalance/include/common.css">
+
+<div class="rb" id="rb">
+  <div class="head">
+    <div>
+      <div class="eyebrow"><?=htmlspecialchars(strtoupper($var['NAME'] ?? 'UNRAID'))?> · UNRAID ARRAY</div>
+      <div class="title-row"><h1>Array Rebalance</h1><span class="pill" id="rb-pill"><i></i><span>Loading</span></span><a class="pill localURL" id="rb-moves-pill" href="#rb-moves" hidden>View move script</a></div>
+      <div class="muted" id="rb-meta">&nbsp;</div>
+    </div>
+    <div class="actions" id="rb-actions"></div>
+  </div>
+
+  <div class="msg" id="rb-msg"></div>
+  <div class="chips" id="rb-chips"></div>
+
+  <div class="row">
+    <section class="card" style="flex:1.3 1 0">
+      <h2 class="label">Overall progress</h2>
+      <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+        <div class="big" id="rb-pct">-</div>
+        <div class="soft" id="rb-pct-sub" style="font-size:16px"></div>
+      </div>
+      <div class="bar"><div id="rb-bar" style="width:0"></div></div>
+      <div class="stats">
+        <div class="stat"><div class="k">Moves</div><div class="v" id="rb-s-moves">-</div></div>
+        <div class="stat"><div class="k">Skipped (busy / linked)</div><div class="v" id="rb-s-skip">-</div></div>
+        <div class="stat"><div class="k">Average rate</div><div class="v" id="rb-s-avg">-</div></div>
+        <div class="stat"><div class="k">Finish (at current rate)</div><div class="v" id="rb-s-eta">-</div></div>
+      </div>
+    </section>
+    <section class="card" style="flex:1 1 0" id="rb-current"></section>
+  </div>
+
+  <div class="row">
+    <section class="card" style="flex:1.6 1 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+        <div>
+          <h2 class="h2">Disk balance</h2>
+          <div class="muted" id="rb-target-line" style="font-size:13px"></div>
+        </div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--amber)"></i>Over target</span>
+          <span><i class="sw" style="background:var(--grey)"></i>Within tolerance</span>
+          <span><i class="sw" style="background:var(--blue)"></i>Under target</span>
+          <span><i style="height:14px;border-left:2px dashed var(--mark)"></i>Target</span>
+          <span><i style="width:2px;height:14px;background:var(--tick)"></i>At start of run</span>
+        </div>
+      </div>
+      <div class="dgrid axis">
+        <span>DISK</span><span class="dsize" style="text-align:right">SIZE</span>
+        <div class="scale" id="rb-scale"></div>
+        <span style="text-align:right">USED</span><span style="text-align:right">VS TARGET</span>
+      </div>
+      <div id="rb-disks" style="display:flex;flex-direction:column;gap:6px"></div>
+    </section>
+    <div style="flex:1 1 0;display:flex;flex-direction:column;gap:22px;min-width:0">
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="h2">Up next</h2><span class="muted" id="rb-q-meta" style="font-size:13px"></span></div>
+        <div class="list" id="rb-queue"></div>
+      </section>
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="h2">Recently completed</h2><span class="muted" id="rb-h-meta" style="font-size:13px"></span></div>
+        <div class="list" id="rb-hist"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="logbox">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="label">Log</h2><span style="display:flex;gap:16px;flex-wrap:wrap"><a id="rb-script" href="/plugins/rebalance/include/script.php" target="_blank" rel="noopener" hidden>View move script</a><a href="/plugins/rebalance/include/log.php">Download full log</a></span></div>
+    <div class="loglines" id="rb-log"></div>
+  </section>
+
+  <section class="logbox" id="rb-moves" hidden>
+    <h2 class="label">Move script</h2>
+    <div class="loglines" id="rb-moves-text"></div>
+  </section>
+
+  <details id="rb-settings">
+    <summary>Settings</summary>
+    <form class="form" id="rb-form" onsubmit="return false">
+      <div class="field"><label for="f-TOLERANCE_PCT">Tolerance (% of each disk)</label><input type="number" id="f-TOLERANCE_PCT" name="TOLERANCE_PCT" min="1" max="20"><span class="hint">A disk counts as balanced within this band.</span></div>
+      <div class="field"><label for="f-ITEM_DEPTH">Item depth</label><input type="number" id="f-ITEM_DEPTH" name="ITEM_DEPTH" min="1" max="3"><span class="hint">1 = /Share/&lt;item&gt;, 2 = /Share/&lt;dir&gt;/&lt;item&gt;</span></div>
+      <div class="field"><label for="f-MIN_FREE_GB">Minimum free space (GB)</label><input type="number" id="f-MIN_FREE_GB" name="MIN_FREE_GB" min="0"><span class="hint">Never fill a receiving disk past this.</span></div>
+      <div class="field"><label for="f-MAX_MOVE_GB">Max data per run (GB)</label><input type="number" id="f-MAX_MOVE_GB" name="MAX_MOVE_GB" min="0"><span class="hint">0 = unlimited.</span></div>
+      <div class="field"><label for="f-SKIP_RECENT_MIN">Skip items modified within (min)</label><input type="number" id="f-SKIP_RECENT_MIN" name="SKIP_RECENT_MIN" min="0"><span class="hint">0 = off.</span></div>
+      <div class="field"><label for="f-MAX_PAUSE_HOURS">Give up after pausing (hours)</label><input type="number" id="f-MAX_PAUSE_HOURS" name="MAX_PAUSE_HOURS" min="1"><span class="hint">E.g. a parity check left paused.</span></div>
+      <div class="field"><label for="f-EXCLUDE_SHARES">Exclude shares</label><input type="text" id="f-EXCLUDE_SHARES" name="EXCLUDE_SHARES"><span class="hint">Comma-separated.</span></div>
+      <div class="field"><label for="f-INCLUDE_SHARES">Only these shares</label><input type="text" id="f-INCLUDE_SHARES" name="INCLUDE_SHARES"><span class="hint">Blank = all eligible shares.</span></div>
+      <div class="field"><label for="f-EXCLUDE_DISKS">Exclude disks</label><input type="text" id="f-EXCLUDE_DISKS" name="EXCLUDE_DISKS"><span class="hint">E.g. disk5,disk6</span></div>
+      <div class="field wide"><label for="f-SKIP_PATTERNS">In-progress file patterns</label><input type="text" id="f-SKIP_PATTERNS" name="SKIP_PATTERNS"><span class="hint">Items containing any of these are skipped.</span></div>
+      <div class="field">
+        <label class="check"><input type="checkbox" name="TURBO_WRITE"> Reconstruct write during moves</label>
+        <label class="check"><input type="checkbox" name="PAUSE_ON_PARITY"> Pause for parity check / mover</label>
+        <label class="check"><input type="checkbox" name="NOTIFY"> Unraid notifications</label>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" name="SKIP_OPEN_FILES"> Skip items with open files</label>
+        <label class="check"><input type="checkbox" name="SKIP_HARDLINKED"> Skip items with external hardlinks</label>
+      </div>
+      <div class="form-actions"><button type="button" class="rb-btn primary" id="rb-save">Save settings</button><span class="muted" id="rb-save-msg"></span></div>
+    </form>
+  </details>
+</div>
+
+<script src="/plugins/rebalance/include/common.js"></script>
+<script>
+(function () {
+  var el = RB.el, TI = RB.TI, fmtSigned = RB.fmtSigned;
+  var $ = function (id) { return document.getElementById(id); };
+  var formLoaded = false, R;
+
+  function renderDisks(d) {
+    var T = d.target_pct, tol = d.tol_pct, rows = d.disks;
+    $('rb-target-line').textContent = 'Used % per data disk \u00b7 target ' + T.toFixed(2) + '% \u00b7 tolerance \u00b1' + tol + '% of each disk';
+    var lo = 100;
+    rows.forEach(function (x) {
+      lo = Math.min(lo, x.used / x.size * 100);
+      if (x.start_used != null) lo = Math.min(lo, x.start_used / x.size * 100);
+    });
+    lo = Math.max(0, Math.min(Math.floor((Math.min(lo, T) - 3) / 10) * 10, 90));
+    var pos = function (p) { return Math.max(0, Math.min(100, (p - lo) / (100 - lo) * 100)).toFixed(2) + '%'; };
+
+    var sc = $('rb-scale'); sc.textContent = '';
+    var step = 100 - lo > 60 ? 20 : 10;
+    for (var v = lo; v <= 100; v += step) {
+      var s = el('span', null, v + '%');
+      s.style.left = pos(v); if (v === lo) s.style.transform = 'none'; if (v === 100) s.style.transform = 'translateX(-100%)';
+      sc.append(s);
+    }
+    var box = $('rb-disks'); box.textContent = '';
+    rows.forEach(function (x) {
+      var pct = x.used / x.size * 100, delta = x.used - x.size * T / 100, band = x.size * tol / 100;
+      var st = x.excluded ? 'excl' : delta > band ? 'over' : delta < -band ? 'under' : 'ok';
+      var row = el('div', 'dgrid drow' + (x.excluded ? ' excl' : ''));
+      row.append(el('div', 'mono', x.name));
+      var sz = el('div', 'muted dsize', (x.size / TI).toFixed(1) + ' TiB'); sz.style.cssText = 'font-size:12px;text-align:right'; row.append(sz);
+      var tr = el('div', 'track'), fill = el('div', 'fill');
+      fill.style.width = pos(pct); fill.style.background = { over: 'var(--amber)', under: 'var(--blue)', ok: 'var(--grey)', excl: 'var(--grey)' }[st];
+      tr.append(fill);
+      if (x.start_used != null) { var tk = el('div', 'tick'); tk.style.left = pos(x.start_used / x.size * 100); tr.append(tk); }
+      if (!x.excluded) { var tl = el('div', 'tline'); tl.style.left = pos(T); tr.append(tl); }
+      row.append(tr);
+      row.append(el('div', 'num', pct.toFixed(2) + '%'));
+      var dn = el('div', 'num', x.excluded ? 'excluded' : fmtSigned(delta));
+      dn.style.color = { over: 'var(--amber-t)', under: 'var(--blue-t)', ok: 'var(--muted)', excl: 'var(--muted)' }[st];
+      row.append(dn);
+      box.append(row);
+    });
+  }
+
+  function loadForm(cfg) {
+    var f = $('rb-form');
+    Object.keys(cfg).forEach(function (k) {
+      var i = f.elements[k]; if (!i) return;
+      if (i.type === 'checkbox') i.checked = cfg[k] === 'true'; else i.value = cfg[k];
+    });
+    formLoaded = true;
+  }
+
+  R = RB.dashboard('rb', {
+    csrf: "<?=$var['csrf_token']?>", move: false,
+    otherName: 'Data Move', otherTab: 'tab2', otherRoot: 'dm', otherBusy: 'A data move is running.',
+    ask: { run: 'Start moving data now? The plan is rebuilt from the current disk usage first. Moves are disk-to-disk and parity stays valid throughout.' },
+    idle: function () { return [['Dry run', 'plan'], ['Start rebalance', 'run', 'primary']]; },
+    render: function (d) { renderDisks(d); if (!formLoaded) loadForm(d.cfg); }
+  });
+  $('rb-save').addEventListener('click', function () {
+    var f = $('rb-form'), data = {};
+    Array.prototype.forEach.call(f.elements, function (i) {
+      if (!i.name) return; data[i.name] = i.type === 'checkbox' ? (i.checked ? 'true' : 'false') : i.value;
+    });
+    $('rb-save-msg').textContent = 'Saving\u2026';
+    R.post('save', data).then(function (j) { $('rb-save-msg').textContent = j.msg; $('rb-save-msg').style.color = j.ok ? '' : 'var(--red-t)'; });
+  });
+})();
+</script>
