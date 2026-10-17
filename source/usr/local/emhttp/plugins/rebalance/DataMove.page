@@ -105,7 +105,7 @@ Markdown="false"
     if (n.kids || n.loading || n.kind === 'file') return;
     n.loading = true; n.err = '';
     fetch(RB.BASE + 'browse.php?disk=' + encodeURIComponent(n.disk) + '&path=' + encodeURIComponent(n.rel), { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
+      .then(function (r) { return r.json().catch(function () { throw new Error('Could not list this folder'); }); })   // e.g. the login page after a session timeout
       .then(function (j) {
         if (!j.ok) throw new Error(j.msg);
         n.kids = j.entries.map(function (e) {   // a ticked folder ticks its children as they load
@@ -118,7 +118,7 @@ Markdown="false"
   function state(n) {   // 'all' | 'some' | 'none'; rows excluded in settings never count
     if (n.excluded) return 'none';
     var ks = (n.kids || []).filter(function (k) { return !k.excluded; });
-    if (!ks.length) return n.sel ? 'all' : 'none';
+    if (!ks.length) return n.sel && !(n.kids && n.kids.length) ? 'all' : 'none';   // loaded children that are all excluded: nothing to move
     var a = 0, z = 0;
     ks.forEach(function (k) { var s = state(k); if (s === 'all') a++; else if (s === 'none') z++; });
     return a === ks.length ? 'all' : z === ks.length ? 'none' : 'some';
@@ -159,9 +159,10 @@ Markdown="false"
         var ch = el('button', 'chev' + (n.kind === 'file' ? ' blank' : '')); ch.type = 'button';
         ch.setAttribute('aria-expanded', n.open ? 'true' : 'false'); ch.setAttribute('aria-label', (n.open ? 'Collapse ' : 'Expand ') + n.name);
         ch.append(svg('M6 4l4 4-4 4', 'currentColor'));
+        ch.dataset.k = 'ch|' + n.disk + '/' + n.rel;
         ch.addEventListener('click', function () { n.open = !n.open; if (n.open) load(n); R.refresh(); });
         var cb = el('input'); cb.type = 'checkbox'; cb.checked = s === 'all'; cb.indeterminate = s === 'some'; cb.disabled = locked || n.excluded;
-        cb.setAttribute('aria-label', 'Move ' + n.disk + (n.rel ? '/' + n.rel : ''));
+        cb.setAttribute('aria-label', 'Move ' + n.disk + (n.rel ? '/' + n.rel : '')); cb.dataset.k = 'cb|' + n.disk + '/' + n.rel;
         cb.addEventListener('change', function () { setSel(n, cb.checked); dirty = true; R.refresh(); });
         lead.append(ch, cb);
         if (n.kind === 'disk') {
@@ -170,12 +171,12 @@ Markdown="false"
           var mini = el('div', 'mini'), u = el('i', 'used'); u.style.width = (x.used / x.size * 100) + '%'; mini.append(u);
           if (out) { var og = el('i', 'out'); og.style.left = (Math.max(0, x.used - out) / x.size * 100) + '%'; og.style.width = (Math.min(out, x.used) / x.size * 100) + '%'; mini.append(og); }
           lead.append(mini);
-          if (out) lead.append(el('span', 'delta o', '−' + fmtKiB(out)));
+          if (out) lead.append(el('span', 'delta o', '\u2212' + fmtKiB(out)));
         } else {
           var nm = el('span', 'tname ellip ' + (n.kind === 'file' ? 'file' : 'dir'), n.name); nm.title = n.disk + '/' + n.rel; lead.append(nm);
           if (n.excluded) lead.append(el('span', 'muted', n.depth === 1 && n.kind === 'file' ? 'not in a share' : 'excluded in settings'));
         }
-        row.append(lead, el('div', 'tsize', n.loading ? 'loading…' : n.err || fmtKiB(n.kib) + (n.kind === 'disk' ? ' used' : '')));
+        row.append(lead, el('div', 'tsize', n.loading ? 'loading\u2026' : n.err || fmtKiB(n.kib) + (n.kind === 'disk' ? ' used' : '')));
         box.append(row);
         if (n.open && n.kids) walk(n.kids);
       });
@@ -242,7 +243,7 @@ Markdown="false"
       var src = !!P.full[x.name], on = !!DEST[x.name] && !src, inc = P.incoming[x.name] || 0;
       var row = el('div', 'xrow' + (on ? ' on' : '') + (src ? ' src' : ''));
       var cb = el('input'); cb.type = 'checkbox'; cb.id = 'dm-dst-' + x.name; cb.checked = on; cb.disabled = src || locked;
-      cb.setAttribute('aria-label', 'Move to ' + x.name);
+      cb.setAttribute('aria-label', 'Move to ' + x.name); cb.dataset.k = 'dst|' + x.name;
       cb.addEventListener('change', function () { DEST[x.name] = cb.checked; dirty = true; R.refresh(); });
       var nm = el('label', 'mono', x.name); nm.htmlFor = cb.id; nm.style.fontSize = '14px';
       var sz = el('div', 'muted dsz', (x.size / TI).toFixed(1) + ' TiB'); sz.style.cssText = 'font-size:12px;text-align:right';
@@ -297,10 +298,15 @@ Markdown="false"
     $('k-eta').textContent = 'Finish (at current rate)';
   }
 
+  var ran = 0;   // 1 = a real move was started, 2 = and has been seen running; shortcut: a run that ends between two polls is never seen, the tree then reloads on the next page load
   function render(o) {
     S = o;
     var locked = RB.ACTIVE.indexOf(o.state) >= 0, P = plan();
+    if (locked && ran === 1) ran = 2;
+    if (!locked && ran === 2) { TREE = null; ran = 0; }   // the move is over: list the folders again rather than show what has left
+    var a = document.activeElement, k = a && a.dataset ? a.dataset.k : null;   // the rebuild below destroys the focused control
     renderTree(P, locked); renderDests(P, locked);
+    if (k) { var e = [].filter.call(document.querySelectorAll('[data-k]'), function (x) { return x.dataset.k === k; })[0]; if (e && e !== a) e.focus({ preventScroll: true }); }
     if (!locked && (o.state !== 'planned' || dirty)) renderSelection(o, P); else activeLabels();
   }
 
@@ -326,7 +332,7 @@ Markdown="false"
     },
     extra: function (action) {
       if (action !== 'move-plan' && action !== 'move-run') return null;
-      dirty = false;
+      dirty = false; if (action === 'move-run') ran = 1;
       return { items: JSON.stringify(picked().map(function (n) { return { disk: n.disk, rel: n.rel }; })), dests: JSON.stringify(destNames()) };
     },
     render: render
