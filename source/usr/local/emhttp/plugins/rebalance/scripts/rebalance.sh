@@ -345,22 +345,37 @@ ticked_near() {   # disk rel -> 0 when disk holds a ticked unit at rel, inside r
   while [[ $p == */* ]]; do p=${p%/*}; [[ ${TICKED["$1|$p"]} == 1 ]] && return 0; done
   return 1
 }
-expand_units() {   # SEL_ITEMS -> $RUN/cand.units ("kib<TAB>path" NUL records, largest first). A whole disk, a share or a folder above ITEM_DEPTH splits into its items; a deeper folder or any file is one unit
-  local a d rel share n dir
+left_behind() {   # path why -> counted in plan_left and, for the first 50, logged as PLAN-LEFT. The entry is never moved
+  (( plan_left++ < 50 )) && log "PLAN-LEFT  ${1//[$'\n\t']/?}  ($2)" >&2
+  return 0
+}
+expand_dir() {   # dir k -> NUL-separated units below dir: every entry k levels down, and every file or link above that. Hidden names and names with a tab or newline are left behind
+  local rec t y
+  while IFS= read -r -d '' rec; do
+    t=${rec%% *}; rec=${rec#* }
+    if [[ $t == L ]]; then left_behind "$rec" "hidden, or a tab or newline in the name"; continue; fi
+    y=${rec%% *}; rec=${rec#* }
+    if (( t == $2 )) || [[ $y != d ]]; then printf '%s\0' "$rec"; fi   # a folder above depth k is walked, never moved whole
+  done < <(find "$1" -mindepth 1 -maxdepth "$2" \( -name '.*' -o -name $'*\n*' -o -name $'*\t*' \) -prune -printf 'L %p\0' -o -printf '%d %y %p\0')
+}
+expand_units() {   # SEL_ITEMS -> $RUN/cand.units ("kib<TAB>path" NUL records, largest first). A whole disk, a share or a folder above ITEM_DEPTH splits into its items plus any file or link above item depth; a deeper folder or any file is one unit
+  local a d rel share n p
   for a in "${SEL_ITEMS[@]}"; do
     d=${a%%$'\t'*}; rel=${a#*$'\t'}; share=${rel%%/*}
     if [[ -n $share ]] && ! share_eligible "$share"; then
       log "PLAN-SKIP  $MNT/$d/$rel  (share excluded in settings)" >&2; (( plan_skipped++ )); continue
     fi
     n=${rel//[!\/]/}; n=$(( ${#n} + 1 )); [[ -z $rel ]] && n=0   # path depth: 0 = the whole disk, 1 = a share
-    if (( n == 0 )); then
-      for dir in "$MNT/$d"/*/; do
-        [[ -d $dir ]] || continue
-        share=${dir%/}; share=${share##*/}
-        share_eligible "$share" && item_paths "$MNT/$d/$share" "$ITEM_DEPTH"
-      done
+    if (( n == 0 )); then   # a whole disk: each eligible share expands; nothing else at the disk root moves
+      while IFS= read -r -d '' p; do
+        share=${p##*/}
+        if [[ $share == .* || $share == *[$'\n\t']* ]]; then left_behind "$p" "hidden, or a tab or newline in the name"
+        elif [[ ! -d $p || -L $p ]]; then left_behind "$p" "not in a share"
+        elif ! share_eligible "$share"; then left_behind "$p" "share excluded in settings"
+        else expand_dir "$p" "$ITEM_DEPTH"; fi
+      done < <(find "$MNT/$d" -mindepth 1 -maxdepth 1 -print0)
     elif (( n <= ITEM_DEPTH )) && [[ -d $MNT/$d/$rel && ! -L $MNT/$d/$rel ]]; then
-      item_paths "$MNT/$d/$rel" $(( ITEM_DEPTH + 1 - n ))
+      expand_dir "$MNT/$d/$rel" $(( ITEM_DEPTH + 1 - n ))
     else
       printf '%s\0' "$MNT/$d/$rel"   # one unit as it is
     fi
@@ -370,11 +385,12 @@ expand_units() {   # SEL_ITEMS -> $RUN/cand.units ("kib<TAB>path" NUL records, l
 plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Writes plan.tsv; exits itself on an empty or failed plan (D5)
   local sz path d rel share r recv why bad=0 item has rhas s
   local -A planned_src   # "disk|item folder" -> source disks already planned onto that disk with that item folder
-  plan_count=0; plan_kib=0; plan_skipped=0
+  plan_count=0; plan_kib=0; plan_skipped=0; plan_left=0
   : > "$RUN/plan.tsv"
   read_selection
   log "Scanning the selection (depth $ITEM_DEPTH)"
   expand_units
+  (( plan_left > 50 )) && log "PLAN-LEFT  ... and $(( plan_left - 50 )) more, not listed"
   while IFS=$'\t' read -r -d '' sz path; do   # where the ticked data sits now, before anything is placed
     d=${path#"$MNT/"}; d=${d%%/*}; rel=${path#"$MNT/$d/"}
     TICKED["$d|$rel"]=1
@@ -419,15 +435,16 @@ plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Wri
   rm -f "$RUN"/cand.*
   st_set plan_count "$plan_count" plan_kib "$plan_kib" plan_skipped "$plan_skipped"
   report "PROJECTED AFTER"
-  summary="$plan_count move(s), $(human "$plan_kib") planned; $plan_skipped item(s) left out (in-progress, hardlinked or excluded share)"
+  left=""; (( plan_left )) && left="; $plan_left left behind (hidden or odd names, outside a share or in an excluded share)"
+  summary="$plan_count move(s), $(human "$plan_kib") planned; $plan_skipped item(s) left out (in-progress, hardlinked or excluded share)$left"
   log "Plan: $summary"
   if (( bad )); then   # D5: nothing moves while any ticked item cannot be placed
     write_move_script   # the move script shows what would have moved
     die "$bad item(s) cannot be moved - they don't fit above the minimum free space or would overwrite a file. Nothing was moved; see the log"
   fi
   if (( plan_count == 0 )); then
-    msg="Nothing can be moved - $plan_skipped item(s) left out (in-progress, hardlinked or excluded share), see log"
-    (( plan_skipped )) || msg="Nothing to move - the ticked items hold nothing to move"
+    msg="Nothing can be moved - $plan_skipped item(s) left out (in-progress, hardlinked or excluded share)$left, see log"
+    (( plan_skipped || plan_left )) || msg="Nothing to move - the ticked items hold nothing to move"
     FINAL=done; st_set state done warn 1 msg "$msg"; notify warning "$msg"; exit 0
   fi
 }
@@ -591,10 +608,12 @@ restore_wm
 read_disks
 report "AFTER"
 summary="$done_count of $plan_count moved ($(human "$done_kib")), $skipped skipped"
+lvl=normal
+if $MOVE && (( plan_left )); then summary+=", $plan_left left behind - see log"; st_set warn 1; lvl=warning; fi   # D5: a Data Move never leaves anything behind silently
 if (( STOP_REQ )); then
   FINAL=stopped; st_set state stopped cur_idx 0 msg "Stopped by user: $summary"
   log "Stopped by user: $summary"; notify normal "Stopped: $summary"
 else
   FINAL=done; st_set state done cur_idx 0 msg "$summary"
-  log "Done: $summary"; notify normal "Done: $summary"
+  log "Done: $summary"; notify "$lvl" "Done: $summary"
 fi

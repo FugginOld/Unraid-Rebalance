@@ -131,11 +131,11 @@ Markdown="false"
     })(TREE || []);
     return out;
   }
-  function units() {   // what the engine plans: a ticked disk, share or folder above Item depth splits into its items
+  function units() {   // what the engine plans: a ticked disk, share or folder above Item depth splits into its items, plus any file or link above Item depth (files at the disk root are excluded rows: the engine leaves them behind)
     var out = [], D = depth();
     function add(n) {
       if (n.kind !== 'file' && n.depth <= D && n.kids) {
-        n.kids.forEach(function (k) { if (!k.excluded && !(k.kind === 'file' && k.depth <= D)) add(k); });
+        n.kids.forEach(function (k) { if (!k.excluded) add(k); });
         return;
       }
       out.push({ n: n, approx: n.kind !== 'file' && n.depth <= D });   // not expanded yet: previewed as one piece

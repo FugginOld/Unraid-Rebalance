@@ -326,6 +326,37 @@ sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk2\ttv/Show A (2001)' $'dest\tdi
 bash "$ENGINE" move-plan; rc=$?
 check "with only the two ticked disks as destinations the plan fails instead of swapping" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-NOFIT.*disk1/tv/Show A (2001)" "$T/rb.log"'
 
+echo "== data move: files and links above Item depth move as their own units"
+make_fixture
+echo 'ITEM_DEPTH="2"' >> "$T/rb.cfg"
+echo loose > "$T/mnt/disk1/tv/loose.nfo"; ln -s ../movies "$T/mnt/disk1/tv/movies link"
+find "$T/mnt/disk1/tv" -exec touch -h -d '2 hours ago' {} +
+sel $'item\tdisk1\ttv' $'dest\tdisk3'
+bash "$ENGINE" move-run; rc=$?
+check "a file above Item depth in a ticked share moves" '[[ $rc == 0 && $(st state) == done && $(cat "$T/mnt/disk3/tv/loose.nfo" 2>/dev/null) == loose && ! -e $T/mnt/disk1/tv/loose.nfo ]]'
+check "a link above Item depth in a ticked share moves as a link" '[[ -L "$T/mnt/disk3/tv/movies link" && ! -L "$T/mnt/disk1/tv/movies link" ]]'
+
+echo "== data move: hidden entries, odd names and files outside shares are left behind, with a warning"
+make_fixture
+sed -i 's/NOTIFY="false"/NOTIFY="true"/' "$T/rb.cfg"
+TAB=$'\t'
+mkdir -p "$T/mnt/disk2/.Recycle.Bin" "$T/mnt/disk2/movies/Odd${TAB}Name"
+echo h > "$T/mnt/disk2/movies/.hidden"; echo r > "$T/mnt/disk2/.Recycle.Bin/r"; echo z > "$T/mnt/disk2/rootfile"; echo t > "$T/mnt/disk2/movies/Odd${TAB}Name/t"
+find "$T/mnt/disk2" -exec touch -h -d '2 hours ago' {} +
+sel $'item\tdisk2\t' $'dest\tdisk3'
+bash "$ENGINE" move-run; rc=$?
+check "a whole disk still moves its shares' items" '[[ $rc == 0 && $(st state) == done && -d "$T/mnt/disk3/movies/Movie Three" && ! -e "$T/mnt/disk2/movies/Movie Three" ]]'
+check "hidden entries, odd names and files outside shares stay, each logged" '[[ -f $T/mnt/disk2/movies/.hidden && -f $T/mnt/disk2/.Recycle.Bin/r && -f $T/mnt/disk2/rootfile && -f "$T/mnt/disk2/movies/Odd${TAB}Name/t" && $(grep -c "PLAN-LEFT" "$T/rb.log") == 4 ]]'
+check "a move that leaves things behind ends as a warning that says so" '[[ $(st warn) == 1 && $(st msg) == *"4 left behind"* ]] && grep -q -- "-i warning" "$T/notify.log"'
+
+echo "== data move: the left-behind list in the log is capped"
+make_fixture
+for i in $(seq 55); do touch "$T/mnt/disk2/movies/.h$i"; done
+find "$T/mnt/disk2" -exec touch -h -d '2 hours ago' {} +
+sel $'item\tdisk2\tmovies' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "the log names 50 left-behind entries, then counts the rest" '[[ $rc == 0 && $(st state) == planned && $(grep -c "PLAN-LEFT  /" "$T/rb.log") == 50 && $(st msg) == *"55 left behind"* ]] && grep -q "PLAN-LEFT  \.\.\. and 5 more" "$T/rb.log"'
+
 echo "== browse.php"
 make_fixture
 printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"

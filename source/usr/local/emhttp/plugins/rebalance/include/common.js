@@ -226,7 +226,7 @@ window.RB = window.RB || (function () {
       var box = $('log'); box.textContent = '';
       if (!d.log.length) { box.append(el('div', 'muted', 'No log yet.')); return; }
       d.log.forEach(function (line) {
-        var cls = /\bSKIP\b|PAUSED|WARNING/.test(line) ? 'skip' : /ERROR|ABORT|PLAN-NOFIT|PLAN-CONFLICT/.test(line) ? 'err' : /\bMOVE\b/.test(line) ? 'mv' : '';
+        var cls = /\bSKIP\b|PLAN-LEFT|PAUSED|WARNING/.test(line) ? 'skip' : /ERROR|ABORT|PLAN-NOFIT|PLAN-CONFLICT/.test(line) ? 'err' : /\bMOVE\b/.test(line) ? 'mv' : '';
         box.append(el('div', cls, line));
       });
     }
