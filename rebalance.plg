@@ -17,6 +17,30 @@
         icon="balance-scale" min="6.12.0" support="https://github.com/&author;/&repo;/issues">
 
 <CHANGES>
+###2026.10.17###
+**Added**
+- Data Move tab beside Array Rebalance: tick whole disks, folders or files
+  in a Source tree, tick one or more receiving disks, dry-run, then start.
+  Moves keep their paths, so user shares look the same afterwards, and run
+  with the same progress, pause / stop / abort and log as a rebalance. The
+  page keeps its Settings -> User Utilities -> Array Rebalance address, and
+  Data Move uses the Array Rebalance settings.
+- Placement: largest item first, onto a ticked disk that already holds the
+  item's folder (the files merge), else the one with the most room. An item
+  never goes back to its own disk, onto a disk ticked in full, or onto a
+  disk that holds a ticked item at the same path.
+- Nothing is overwritten: a same-named file on the destination, or a file
+  or link where a folder is needed, fails the dry run and nothing moves.
+  One that appears during the run is skipped and both copies are kept.
+- Items left out (in-progress or hardlinked) and entries left behind
+  (hidden ones such as .Recycle.Bin, names with a tab or line break, files
+  at the disk root, excluded shares) are listed in the log, and the result
+  shows as a warning.
+
+**Fixed**
+- A move stopped because a file appeared on the destination now says
+  "source still present" instead of "rsync exit 0".
+
 ###2026.09.28###
 **Added**
 - The dashboard follows the Unraid display theme (Black, Gray, White or
