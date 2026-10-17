@@ -209,7 +209,7 @@ Markdown="false"
     disks().forEach(function (x) { room[x.name] = x.avail - MIN; incoming[x.name] = 0; outgoing[x.name] = 0; });
     var held = {};   // "disk|path": 1 = a unit's path, 2 = a folder above one (the engine's TICKED)
     us.forEach(function (u) {
-      outgoing[u.n.disk] += u.n.kib; srcs[u.n.disk] = 1; held[u.n.disk + '|' + u.n.rel] = 1;
+      outgoing[u.n.disk] += u.n.kib; srcs[u.n.disk] = 1; held[u.n.disk + '|' + u.n.rel] = u.approx ? 2 : 1;   // an unopened folder is split into its items by the engine, so it only sits above them
       for (var p = u.n.rel; p.indexOf('/') !== -1; ) { p = p.slice(0, p.lastIndexOf('/')); held[u.n.disk + '|' + p] = 2; }
     });
     function near(disk, rel) {   // the engine's ticked_near: disk holds a ticked unit at, inside or above rel, so sending rel there would swap
@@ -282,7 +282,7 @@ Markdown="false"
     var n = P.units.length;
     if (!o.other && o.state !== 'error' && o.state !== 'stale') {
       if (n && !P.dests.length) R.setMsg('Tick at least one destination disk.', 'warn');
-      else if (P.unfit.length) R.setMsg(P.unfit.length + ' item' + (P.unfit.length === 1 ? '' : 's') + ' (' + fmtKiB(P.unfitKiB) + ') won\u2019t fit on the ticked destinations above the minimum free space.' + (P.approx ? ' Some ticked folders are not expanded yet, so this is a rough preview - the dry run is exact.' : ''), 'warn');
+      else if (P.unfit.length) R.setMsg(P.unfit.length + ' item' + (P.unfit.length === 1 ? '' : 's') + ' (' + fmtKiB(P.unfitKiB) + ') won\u2019t fit on the ticked destinations above the minimum free space, or a ticked destination holds a ticked item at that path.' + (P.approx ? ' Some ticked folders are not expanded yet, so this is a rough preview - the dry run is exact.' : ''), 'warn');
       else if (!n && !o.msg) R.setMsg('Tick what to move in Source, then where it goes in Destination.');
     }
     $('ov-label').textContent = 'Selection';

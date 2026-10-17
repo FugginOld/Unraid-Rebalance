@@ -33,9 +33,10 @@
   or link where a folder is needed, fails the dry run and nothing moves.
   One that appears during the run is skipped and both copies are kept.
 - Items left out (in-progress or hardlinked) and entries left behind
-  (hidden ones such as .Recycle.Bin, names with a tab or line break, files
-  at the disk root, excluded shares) are listed in the log, and the result
-  shows as a warning.
+  (when a ticked disk, share or folder is split into its items: hidden ones
+  such as .Recycle.Bin, names with a tab or line break, files at the disk
+  root, excluded shares) are listed in the log, and the result shows as a
+  warning.
 
 **Fixed**
 - A move stopped because a file appeared on the destination now says
