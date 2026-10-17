@@ -598,8 +598,9 @@ while IFS=$'\t' read -r idx sz src dst rel; do
   rm -f "$RUN/progress"
   [[ -d $MNT/$src/$rel ]] && find "$MNT/$src/$rel" -depth -type d -empty -delete
   if (( rc != 0 )) || [[ -e $MNT/$src/$rel ]]; then
-    history "$idx" fail "rsync exit $rc" "$sz" "$src" "$dst" "$t0" "$EPOCHSECONDS" "$rel"
-    die "Move failed (rsync exit $rc): $MNT/$src/$rel -> $dst - stopping"
+    why="rsync exit $rc"; (( rc )) || why="source still present - did a file appear on the destination?"   # rsync --ignore-existing skips such a file and exits 0
+    history "$idx" fail "$why" "$sz" "$src" "$dst" "$t0" "$EPOCHSECONDS" "$rel"
+    die "Move failed ($why): $MNT/$src/$rel -> $dst - stopping"
   fi
   history "$idx" done "" "$sz" "$src" "$dst" "$t0" "$EPOCHSECONDS" "$rel"
   (( done_count++, done_kib += sz ))

@@ -26,6 +26,8 @@ Then open **Settings → User Utilities → Array Rebalance**. Start with **Dry 
 
 **Dry run** only builds the plan. **Start rebalance** rebuilds the plan from current usage, then executes it.
 
+**Data Move** (second tab) sends the ticked disks, folders or files to the ticked disks, keeping their paths. A ticked disk, share or folder above `ITEM_DEPTH` splits into its items, plus any file or link that sits above that depth. Items go largest first onto a ticked disk that already holds their folder, else the one with the most room; never back to their own disk, onto a disk ticked in full, or onto a disk that holds a ticked item at the same path. A same-named file on the destination, or a file or link where a folder is needed, fails the dry run and nothing moves. Never moved: hidden entries (such as `.Recycle.Bin`), names containing a tab or line break, files at the disk root and shares excluded in settings — the log lists them as `PLAN-LEFT` and the result is a warning. Folders emptied by a move stay on the source disk; delete them by hand if you want. A name that is not valid UTF-8 shows with `�` in the Source tree and cannot be opened or ticked on its own (the page says it no longer exists); tick its parent folder instead.
+
 ## Safety
 
 - Only `/mnt/diskN` → `/mnt/diskN`. Never `/mnt/user`, cache or pools.

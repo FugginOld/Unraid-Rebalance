@@ -126,6 +126,7 @@ PATH=$T/clash:$PATH bash "$ENGINE" run; rc=$?
 check "a clash found mid-move stops the run with an error" '[[ $rc == 1 && $(st state) == error ]]'
 check "the clashing destination file is kept" '[[ $(cat "$T/mnt/disk4/movies/Movie One (2020)/data.bin" 2>/dev/null) == clash ]]'
 check "the source copy is kept" '[[ $(stat -c %s "$T/mnt/disk1/movies/Movie One (2020)/data.bin" 2>/dev/null) == 409600 ]]'
+check "the error says the source is still there, not a bare rsync exit 0" '[[ $(st msg) == "Move failed (source still present - did a file appear on the destination?): "* ]] && grep -q "$(printf "\tfail\tsource still present")" "$T/run/history.tsv"'
 
 echo "== dry run on a balanced array"
 make_fixture; rm -rf "$T"/mnt/disk*/*               # empty disks: nothing is over target
