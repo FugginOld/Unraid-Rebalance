@@ -97,11 +97,101 @@ Markdown="false"
   function disks() { return S.disks.filter(function (x) { return !x.excluded; }); }
 
   /* ---------- source tree ---------- */
-  var TREE = null;
-  function picked() { return []; }
-  function units() { return []; }
-  function loaded() { return null; }
-  function renderTree() {}
+  var TREE = null, svg = RB.svg;
+  function node(disk, rel, name, kind, kib, lvl, sel, excluded) {
+    return { disk: disk, rel: rel, name: name, kind: kind, kib: kib, depth: lvl, sel: sel, excluded: excluded, open: false, kids: null, loading: false, err: '' };
+  }
+  function load(n) {   // children come from browse.php one folder at a time, when the folder is opened
+    if (n.kids || n.loading || n.kind === 'file') return;
+    n.loading = true; n.err = '';
+    fetch(RB.BASE + 'browse.php?disk=' + encodeURIComponent(n.disk) + '&path=' + encodeURIComponent(n.rel), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) throw new Error(j.msg);
+        n.kids = j.entries.map(function (e) {   // a ticked folder ticks its children as they load
+          return node(n.disk, n.rel ? n.rel + '/' + e.name : e.name, e.name, e.type, e.kib, n.depth + 1, n.sel && !e.excluded, e.excluded);
+        });
+      })
+      .catch(function (e) { n.err = e && e.message ? e.message : 'Could not list this folder'; })
+      .then(function () { n.loading = false; R.refresh(); });
+  }
+  function state(n) {   // 'all' | 'some' | 'none'; rows excluded in settings never count
+    if (n.excluded) return 'none';
+    var ks = (n.kids || []).filter(function (k) { return !k.excluded; });
+    if (!ks.length) return n.sel ? 'all' : 'none';
+    var a = 0, z = 0;
+    ks.forEach(function (k) { var s = state(k); if (s === 'all') a++; else if (s === 'none') z++; });
+    return a === ks.length ? 'all' : z === ks.length ? 'none' : 'some';
+  }
+  function setSel(n, v) { if (n.excluded) return; n.sel = v; (n.kids || []).forEach(function (k) { setSel(k, v); }); }
+  function picked() {   // what is sent: the minimal set of fully ticked nodes (a ticked folder, never its files)
+    var out = [];
+    (function walk(list) {
+      list.forEach(function (n) { var s = state(n); if (s === 'all') out.push(n); else if (s === 'some') walk(n.kids); });
+    })(TREE || []);
+    return out;
+  }
+  function units() {   // what the engine plans: a ticked disk, share or folder above Item depth splits into its items
+    var out = [], D = depth();
+    function add(n) {
+      if (n.kind !== 'file' && n.depth <= D && n.kids) {
+        n.kids.forEach(function (k) { if (!k.excluded && !(k.kind === 'file' && k.depth <= D)) add(k); });
+        return;
+      }
+      out.push({ n: n, approx: n.kind !== 'file' && n.depth <= D });   // not expanded yet: previewed as one piece
+    }
+    picked().forEach(function (n) { add(n); });
+    return out.sort(function (a, b) { return b.n.kib - a.n.kib; });
+  }
+  function loaded(disk, rel) {   // the loaded tree node at disk/rel, or null
+    var n = (TREE || []).filter(function (x) { return x.disk === disk; })[0] || null;
+    rel.split('/').forEach(function (p) { n = n && n.kids ? n.kids.filter(function (k) { return k.name === p; })[0] || null : null; });
+    return n;
+  }
+  function renderTree(P, locked) {
+    if (!TREE) TREE = disks().map(function (x) { return node(x.name, '', x.name, 'disk', x.used, 0, false, false); });
+    TREE.forEach(function (n) { S.disks.forEach(function (x) { if (x.name === n.disk) n.kib = x.used; }); });
+    var box = $('tree'), top = box.scrollTop; box.textContent = '';
+    (function walk(list) {
+      list.forEach(function (n) {
+        var s = state(n), row = el('div', 'trow' + (s !== 'none' ? ' on' : ''));
+        var lead = el('div', 'tlead'); lead.style.paddingLeft = (n.depth * 18) + 'px';
+        var ch = el('button', 'chev' + (n.kind === 'file' ? ' blank' : '')); ch.type = 'button';
+        ch.setAttribute('aria-expanded', n.open ? 'true' : 'false'); ch.setAttribute('aria-label', (n.open ? 'Collapse ' : 'Expand ') + n.name);
+        ch.append(svg('M6 4l4 4-4 4', 'currentColor'));
+        ch.addEventListener('click', function () { n.open = !n.open; if (n.open) load(n); R.refresh(); });
+        var cb = el('input'); cb.type = 'checkbox'; cb.checked = s === 'all'; cb.indeterminate = s === 'some'; cb.disabled = locked || n.excluded;
+        cb.setAttribute('aria-label', 'Move ' + n.disk + (n.rel ? '/' + n.rel : ''));
+        cb.addEventListener('change', function () { setSel(n, cb.checked); dirty = true; R.refresh(); });
+        lead.append(ch, cb);
+        if (n.kind === 'disk') {
+          var x = S.disks.filter(function (y) { return y.name === n.disk; })[0] || { used: 0, size: 1 }, out = P.outgoing[n.disk] || 0;
+          lead.append(el('span', 'dname', n.name));
+          var mini = el('div', 'mini'), u = el('i', 'used'); u.style.width = (x.used / x.size * 100) + '%'; mini.append(u);
+          if (out) { var og = el('i', 'out'); og.style.left = (Math.max(0, x.used - out) / x.size * 100) + '%'; og.style.width = (Math.min(out, x.used) / x.size * 100) + '%'; mini.append(og); }
+          lead.append(mini);
+          if (out) lead.append(el('span', 'delta o', '−' + fmtKiB(out)));
+        } else {
+          var nm = el('span', 'tname ellip ' + (n.kind === 'file' ? 'file' : 'dir'), n.name); nm.title = n.disk + '/' + n.rel; lead.append(nm);
+          if (n.excluded) lead.append(el('span', 'muted', n.depth === 1 && n.kind === 'file' ? 'not in a share' : 'excluded in settings'));
+        }
+        row.append(lead, el('div', 'tsize', n.loading ? 'loading…' : n.err || fmtKiB(n.kib) + (n.kind === 'disk' ? ' used' : '')));
+        box.append(row);
+        if (n.open && n.kids) walk(n.kids);
+      });
+    })(TREE);
+    box.scrollTop = top;
+    $('src-lock').hidden = !locked; $('src-clear').disabled = locked;
+    var f = $('src-foot'); f.textContent = '';
+    var l = el('span'); l.append(el('b', null, String(P.units.length)), document.createTextNode(' item' + (P.units.length === 1 ? '' : 's') + ' from '), el('b', null, Object.keys(P.srcs).join(', ') || '-'));
+    var r = el('span'); r.append(el('b', null, fmtKiB(P.kib + P.unfitKiB)), document.createTextNode(' ticked'));
+    f.append(l, r);
+  }
+  $('src-clear').addEventListener('click', function () { (TREE || []).forEach(function (n) { setSel(n, false); }); dirty = true; R.refresh(); });
+  $('src-collapse').addEventListener('click', function () {
+    (function w(l) { l.forEach(function (n) { n.open = false; if (n.kids) w(n.kids); }); })(TREE || []);
+    R.refresh();
+  });
   /* ---------- end source tree ---------- */
 
   function itemOf(rel) { return rel.split('/').slice(0, depth() + 1).join('/'); }   // the item folder at Item depth
