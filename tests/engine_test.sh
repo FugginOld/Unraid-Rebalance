@@ -357,6 +357,13 @@ sel $'item\tdisk2\tmovies' $'dest\tdisk3'
 bash "$ENGINE" move-plan; rc=$?
 check "the log names 50 left-behind entries, then counts the rest" '[[ $rc == 0 && $(st state) == planned && $(grep -c "PLAN-LEFT  /" "$T/rb.log") == 50 && $(st msg) == *"55 left behind"* ]] && grep -q "PLAN-LEFT  \.\.\. and 5 more" "$T/rb.log"'
 
+echo "== data move: a run that left items out says so"
+make_fixture
+sed -i 's/NOTIFY="false"/NOTIFY="true"/' "$T/rb.cfg"
+sel $'item\tdisk1\t' $'dest\tdisk3' $'dest\tdisk4'   # disk1's hardlinked pair (Movie Two, downloads/seed.bin) is left out
+bash "$ENGINE" move-run; rc=$?
+check "a move-run that left items out ends as a warning that counts them" '[[ $rc == 0 && $(st state) == done && $(st warn) == 1 && $(st msg) == *", 2 left out - see log" ]] && grep -q -- "-i warning" "$T/notify.log" && ! grep -q -- "-i normal" "$T/notify.log"'
+
 echo "== browse.php"
 make_fixture
 printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"

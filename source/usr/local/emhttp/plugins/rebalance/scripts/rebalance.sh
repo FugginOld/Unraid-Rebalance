@@ -609,7 +609,11 @@ read_disks
 report "AFTER"
 summary="$done_count of $plan_count moved ($(human "$done_kib")), $skipped skipped"
 lvl=normal
-if $MOVE && (( plan_left )); then summary+=", $plan_left left behind - see log"; st_set warn 1; lvl=warning; fi   # D5: a Data Move never leaves anything behind silently
+if $MOVE && (( plan_skipped + plan_left )); then   # D5: a Data Move never leaves anything out or behind silently
+  (( plan_skipped )) && summary+=", $plan_skipped left out"
+  (( plan_left )) && summary+=", $plan_left left behind"
+  summary+=" - see log"; st_set warn 1; lvl=warning
+fi
 if (( STOP_REQ )); then
   FINAL=stopped; st_set state stopped cur_idx 0 msg "Stopped by user: $summary"
   log "Stopped by user: $summary"; notify normal "Stopped: $summary"

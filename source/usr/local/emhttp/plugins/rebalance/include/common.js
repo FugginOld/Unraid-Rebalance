@@ -89,7 +89,7 @@ window.RB = window.RB || (function () {
 
     function renderHead(d) {
       var s = STATES[d.state] || [d.state, ''];
-      var warn = d.state === 'done' && d.warn;   // "Nothing can be moved": done, but a disk is still over target
+      var warn = d.state === 'done' && d.warn;   // done, but look: "Nothing can be moved", or a data move that left items out or behind
       var label = s[0];
       if (d.state === 'paused' && d.pause_reason && d.pause_reason !== 'user') label = 'Paused \u00b7 ' + d.pause_reason;
       var pending = d.request === 'stop' || (d.request === 'pause' && d.state === 'running') ? d.request : '';
