@@ -311,6 +311,21 @@ PATH=$T/late:$PATH bash "$ENGINE" move-run; rc=$?
 check "a conflict that appears after planning is skipped live" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 1 && $(st skipped) == 1 ]] && grep -q "SKIP.*Movie One (2020).*a file already exists" "$T/rb.log"'
 check "a live-skipped item keeps both copies" '[[ $(cat "$T/mnt/disk3/movies/Movie One (2020)/data.bin") == late && -s "$T/mnt/disk1/movies/Movie One (2020)/data.bin" ]]'
 
+echo "== data move: two ticked disks never swap the same path"
+make_fixture
+mv "$T/mnt/disk2/tv/Show A (2001)/data.bin" "$T/mnt/disk2/tv/Show A (2001)/e02.bin"
+touch -h -d '2 hours ago' "$T/mnt/disk2/tv/Show A (2001)"
+sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk2\ttv/Show A (2001)' $'dest\tdisk1' $'dest\tdisk2' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "the same path ticked on two destination disks gathers on a third, never swaps" '[[ $rc == 0 && $(st state) == planned && $(cut -f3,4 "$T/run/plan.tsv") == "$(printf "disk1\tdisk3\ndisk2\tdisk3")" ]]'
+echo 9000 > "$T/sizes/disk1"   # disk1 now has the most room: only the swap rule keeps the file off it
+sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk2\ttv/Show A (2001)/e02.bin' $'dest\tdisk1' $'dest\tdisk2' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "a ticked folder and a ticked file inside it on another disk never swap" '[[ $rc == 0 && $(st state) == planned && $(cut -f3,4 "$T/run/plan.tsv") == "$(printf "disk1\tdisk3\ndisk2\tdisk3")" ]]'
+sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk2\ttv/Show A (2001)' $'dest\tdisk1' $'dest\tdisk2'
+bash "$ENGINE" move-plan; rc=$?
+check "with only the two ticked disks as destinations the plan fails instead of swapping" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-NOFIT.*disk1/tv/Show A (2001)" "$T/rb.log"'
+
 echo "== browse.php"
 make_fixture
 printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"

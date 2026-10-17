@@ -207,12 +207,21 @@ Markdown="false"
     var us = units(), MIN = minFree(), full = fullDisks();
     var room = {}, incoming = {}, outgoing = {}, srcs = {}, at = {}, moves = [], unfit = [];
     disks().forEach(function (x) { room[x.name] = x.avail - MIN; incoming[x.name] = 0; outgoing[x.name] = 0; });
-    us.forEach(function (u) { outgoing[u.n.disk] += u.n.kib; srcs[u.n.disk] = 1; });
+    var held = {};   // "disk|path": 1 = a unit's path, 2 = a folder above one (the engine's TICKED)
+    us.forEach(function (u) {
+      outgoing[u.n.disk] += u.n.kib; srcs[u.n.disk] = 1; held[u.n.disk + '|' + u.n.rel] = 1;
+      for (var p = u.n.rel; p.indexOf('/') !== -1; ) { p = p.slice(0, p.lastIndexOf('/')); held[u.n.disk + '|' + p] = 2; }
+    });
+    function near(disk, rel) {   // the engine's ticked_near: disk holds a ticked unit at, inside or above rel, so sending rel there would swap
+      if (held[disk + '|' + rel]) return true;
+      for (var p = rel; p.indexOf('/') !== -1; ) { p = p.slice(0, p.lastIndexOf('/')); if (held[disk + '|' + p] === 1) return true; }
+      return false;
+    }
     var dests = disks().filter(function (x) { return DEST[x.name] && !full[x.name]; });
     us.forEach(function (u) {
       var n = u.n, item = itemOf(n.rel), best = null, bestHas = false;
       dests.forEach(function (x) {
-        if (x.name === n.disk || room[x.name] < n.kib) return;
+        if (x.name === n.disk || room[x.name] < n.kib || near(x.name, n.rel)) return;
         var has = !!at[x.name + '|' + item] || !!loaded(x.name, item);
         if (!best || has > bestHas || (has === bestHas && room[x.name] > room[best])) { best = x.name; bestHas = has; }
       });

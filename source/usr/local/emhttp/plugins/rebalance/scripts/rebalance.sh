@@ -297,7 +297,7 @@ write_move_script() {  # plan.tsv -> moves.sh: the dry run's moves as the exact 
 }
 
 ############################## DATA MOVE ##############################
-SEL_ITEMS=(); SEL_DESTS=(); declare -A FULL_SRC
+SEL_ITEMS=(); SEL_DESTS=(); declare -A FULL_SRC TICKED
 bad_rel() { [[ $1 == /* || $1 == */ || $1 == *//* || /$1/ == */./* || /$1/ == */../* ]]; }   # true for an absolute path or an empty, . or .. part
 read_selection() {   # $RUN/selection.tsv -> SEL_ITEMS ("disk<TAB>rel"), SEL_DESTS, FULL_SRC. The engine does not trust the file: any bad line is fatal
   local kind d rel extra p base a
@@ -339,6 +339,12 @@ unit_conflict() {   # src dst rel -> 0 when moving rel would meet a file at the 
   done < <(find "$s" -printf '%y %P\0' 2>/dev/null)
   return 1
 }
+ticked_near() {   # disk rel -> 0 when disk holds a ticked unit at rel, inside rel or above it (TICKED: 1 = a unit's path, 2 = a folder above one): sending rel there would swap data between two ticked disks
+  local p=$2
+  [[ -n ${TICKED["$1|$p"]} ]] && return 0
+  while [[ $p == */* ]]; do p=${p%/*}; [[ ${TICKED["$1|$p"]} == 1 ]] && return 0; done
+  return 1
+}
 expand_units() {   # SEL_ITEMS -> $RUN/cand.units ("kib<TAB>path" NUL records, largest first). A whole disk, a share or a folder above ITEM_DEPTH splits into its items; a deeper folder or any file is one unit
   local a d rel share n dir
   for a in "${SEL_ITEMS[@]}"; do
@@ -369,6 +375,11 @@ plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Wri
   read_selection
   log "Scanning the selection (depth $ITEM_DEPTH)"
   expand_units
+  while IFS=$'\t' read -r -d '' sz path; do   # where the ticked data sits now, before anything is placed
+    d=${path#"$MNT/"}; d=${d%%/*}; rel=${path#"$MNT/$d/"}
+    TICKED["$d|$rel"]=1
+    while [[ $rel == */* ]]; do rel=${rel%/*}; TICKED["$d|$rel"]=2; done
+  done < "$RUN/cand.units"
   while IFS=$'\t' read -r -d '' sz path; do
     d=${path#"$MNT/"}; d=${d%%/*}; rel=${path#"$MNT/$d/"}; share=${rel%%/*}
     why=""
@@ -380,13 +391,14 @@ plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Wri
     for r in "${SEL_DESTS[@]}"; do
       [[ $r == "$d" ]] && continue                     # D3: never back to its own disk
       [[ -n ${FULL_SRC[$r]} ]] && continue             # D3: never onto a disk ticked in full
+      ticked_near "$r" "$rel" && continue              # never onto a disk holding a ticked unit at, inside or above this path: no swap
       (( AVAIL[$r] - sz < MIN_FREE_KB )) && continue   # the minimum free space floor
       share_allows "$share" "$r" || continue
       has=0; [[ -e $MNT/$r/$item || -n ${planned_src["$r|$item"]} ]] && has=1   # D2: prefer the disk that already holds the item folder
       if [[ -z $recv ]] || (( has > rhas || (has == rhas && AVAIL[$r] > AVAIL[$recv]) )); then recv=$r; rhas=$has; fi   # D1: then the most room
     done
     if [[ -z $recv ]]; then
-      log "PLAN-NOFIT $(human "$sz")  $path  (no ticked disk has room above the minimum free space)"; (( bad++ )); continue
+      log "PLAN-NOFIT $(human "$sz")  $path  (no ticked disk has room above the minimum free space, other than ones holding a ticked item at this path)"; (( bad++ )); continue
     fi
     why=""   # D2: merge, never overwrite - neither a file already on the destination nor one another ticked item brings there
     if unit_conflict "$d" "$recv" "$rel"; then why="a file already exists at the same path on $recv"
