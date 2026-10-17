@@ -394,6 +394,13 @@ sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk1\tmovies/Coll/Sub' $'dest\tdis
 PATH=$T/lateparent:$PATH bash "$ENGINE" move-run; rc=$?
 check "a file that appears at a parent path is a live skip, not a failed rsync" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 1 && $(st skipped) == 1 && -f "$T/mnt/disk1/movies/Coll/Sub/f" ]] && grep -q "SKIP.*movies/Coll/Sub" "$T/rb.log"'
 
+echo "== data move: units that share a hardlinked file are each sized in full"
+make_fixture
+echo 'SKIP_HARDLINKED="false"' >> "$T/rb.cfg"   # both halves of disk1's hardlinked pair are planned
+sel $'item\tdisk1\tmovies/Movie Two' $'item\tdisk1\tdownloads/seed.bin' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "units that share a hardlinked file are each sized in full" '[[ $rc == 0 && $(st state) == planned && $(cut -f2 "$T/run/plan.tsv") == "$(printf "304\n300")" ]]'
+
 echo "== browse.php"
 make_fixture
 printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"

@@ -382,7 +382,7 @@ expand_units() {   # SEL_ITEMS -> $RUN/cand.units ("kib<TAB>path" NUL records, l
       printf '%s\0' "$MNT/$d/$rel"   # one unit as it is
     fi
   done > "$RUN/cand.sel"
-  xargs -0 -r du -sk --null -- < "$RUN/cand.sel" 2>/dev/null | sort -z -t$'\t' -k1,1nr > "$RUN/cand.units"
+  xargs -0 -r du -skl --null -- < "$RUN/cand.sel" 2>/dev/null | sort -z -t$'\t' -k1,1nr > "$RUN/cand.units"   # -l: a file hardlinked into two units counts in each (one du run would count it once)
 }
 plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Writes plan.tsv; exits itself on an empty or failed plan (D5)
   local sz path d rel share r recv why bad=0 item has rhas s
