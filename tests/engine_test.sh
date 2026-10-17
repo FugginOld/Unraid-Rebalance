@@ -194,6 +194,7 @@ done
 echo "== data move: a bad selection is refused"
 make_fixture
 ln -s "$T/mnt/disk2/movies" "$T/mnt/disk1/escape"
+ln -s "$T/mnt/disk1/tv" "$T/mnt/disk1/movies/link"   # a link to another folder on the same disk
 while IFS='|' read -r line want; do
   sel "${line//\\t/$'\t'}" $'dest\tdisk3'
   bash "$ENGINE" move-plan; rc=$?
@@ -204,6 +205,7 @@ item\tdisk1\tmovies/../tv|is not a plain relative path
 item\tdisk1\t/movies|is not a plain relative path
 item\tdisk1\tmovies/Nope|does not exist
 item\tdisk1\tescape|is outside disk1
+item\tdisk1\tmovies/link/Show B|has a symlink above it
 bogus\tdisk1\tmovies|unknown line
 EOF
 sel $'item\tdisk1\tmovies' $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk3'
@@ -415,6 +417,10 @@ j=$(act action=move-plan 'items=[{"disk":"disk1","rel":"movies"},{"disk":"disk1"
 check "action.php refuses an item inside another item" '[[ $j == *"\"ok\":false"* && $j == *inside* && ! -e $T/ctl.argv ]]'
 j=$(act action=move-plan 'items=[{"disk":"disk1","rel":"movies"}]' 'dests=[]')
 check "action.php refuses an empty destination list" '[[ $j == *"\"ok\":false"* && $j == *destination* && ! -e $T/ctl.argv ]]'
+ln -s "$T/mnt/disk1/tv" "$T/mnt/disk1/movies/link"   # a link to another folder on the same disk
+j=$(act action=move-plan 'items=[{"disk":"disk1","rel":"movies/link/Show B"}]' 'dests=["disk3"]')
+check "action.php refuses an item with a symlink above it" '[[ $j == *"\"ok\":false"* && $j == *symlink* && ! -e $T/ctl.argv ]]'
+rm -f "$T/ctl.argv"
 j=$(act action=move-plan 'items=[{"disk":"disk1","rel":"movies/Movie One (2020)"},{"disk":"disk2","rel":""}]' 'dests=["disk3","disk4"]')
 check "action.php writes the selection and starts move-plan" '[[ $j == *"\"ok\":true"* && $(cat "$T/ctl.argv") == move-plan && $(cat "$T/run/selection.tsv") == "$(printf "item\tdisk1\tmovies/Movie One (2020)\nitem\tdisk2\t\ndest\tdisk3\ndest\tdisk4")" ]]'
 unset RB_CTL

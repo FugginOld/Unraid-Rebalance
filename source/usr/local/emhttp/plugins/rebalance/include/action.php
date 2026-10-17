@@ -28,6 +28,7 @@ if ($action === 'move-plan' || $action === 'move-run') {   /* Data Move: validat
     $root = realpath("$mnt/$d");
     $p = realpath($r === '' ? "$mnt/$d" : "$mnt/$d/$r");
     if ($root === false || $p === false || ($p !== $root && strpos($p, "$root/") !== 0)) reply(false, "$key no longer exists", 400);
+    if (($i = strrpos($r, '/')) !== false && realpath("$mnt/$d/" . substr($r, 0, $i)) !== "$root/" . substr($r, 0, $i)) reply(false, "$key has a symlink above it", 400);   /* the move goes to the literal path */
     if (isset($seen[$key])) reply(false, "$key is listed twice", 400);
     $seen[$key] = true;
     $lines[] = "item\t$d\t$r";

@@ -315,6 +315,7 @@ read_selection() {   # $RUN/selection.tsv -> SEL_ITEMS ("disk<TAB>rel"), SEL_DES
     p=$(realpath -e -- "$MNT/$d${rel:+/$rel}" 2>/dev/null) || die "Bad selection: $MNT/$d/$rel does not exist"
     base=$(realpath -e -- "$MNT/$d")
     [[ $p == "$base" || $p == "$base"/* ]] || die "Bad selection: $MNT/$d/$rel is outside $d"
+    [[ $rel != */* || $(realpath -e -- "$MNT/$d/${rel%/*}") == "$base/${rel%/*}" ]] || die "Bad selection: $MNT/$d/$rel has a symlink above it"   # the move goes to the literal path: a link above it would split one folder's content across two paths
     [[ -n ${seen["$d/$rel"]} ]] && die "Bad selection: $d/$rel is listed twice"
     seen["$d/$rel"]=1; SEL_ITEMS+=("$d"$'\t'"$rel")
     [[ -z $rel ]] && FULL_SRC[$d]=1
