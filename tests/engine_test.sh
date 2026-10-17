@@ -364,6 +364,34 @@ sel $'item\tdisk1\t' $'dest\tdisk3' $'dest\tdisk4'   # disk1's hardlinked pair (
 bash "$ENGINE" move-run; rc=$?
 check "a move-run that left items out ends as a warning that counts them" '[[ $rc == 0 && $(st state) == done && $(st warn) == 1 && $(st msg) == *", 2 left out - see log" ]] && grep -q -- "-i warning" "$T/notify.log" && ! grep -q -- "-i normal" "$T/notify.log"'
 
+echo "== data move: a file or a link where the destination needs a folder above the item"
+make_fixture
+mkdir -p "$T/mnt/disk1/movies/Coll/Sub"; echo x > "$T/mnt/disk1/movies/Coll/Sub/f"
+find "$T/mnt/disk1/movies/Coll" -exec touch -h -d '2 hours ago' {} +
+echo y > "$T/mnt/disk3/movies/Coll"   # a file where the move needs the folder movies/Coll
+sel $'item\tdisk1\tmovies/Coll/Sub' $'dest\tdisk3'
+bash "$ENGINE" move-plan; rc=$?
+check "a file at a parent path on the destination fails the dry run" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-CONFLICT.*movies/Coll/Sub" "$T/rb.log"'
+rm "$T/mnt/disk3/movies/Coll"; mkdir -p "$T/outside"; ln -s "$T/outside" "$T/mnt/disk3/movies/Coll"   # a link there: rsync would write through it
+bash "$ENGINE" move-run; rc=$?
+check "a link at a parent path on the destination fails the plan, nothing is written through it" '[[ $rc == 1 && $(st state) == error && -z $(ls -A "$T/outside") && -f "$T/mnt/disk1/movies/Coll/Sub/f" ]]'
+
+echo "== data move: a file that appears at a parent path after planning is skipped live"
+make_fixture
+mkdir -p "$T/mnt/disk1/movies/Coll/Sub"; echo x > "$T/mnt/disk1/movies/Coll/Sub/f"
+find "$T/mnt/disk1/movies/Coll" -exec touch -h -d '2 hours ago' {} +
+mkdir -p "$T/lateparent"
+cat > "$T/lateparent/rsync" <<EOF
+#!/bin/bash
+# while the first move copies, a file appears where the second unit needs the folder movies/Coll
+echo late > "$T/mnt/disk3/movies/Coll"
+exec "$REAL_RSYNC" "\$@"
+EOF
+chmod +x "$T/lateparent/rsync"
+sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk1\tmovies/Coll/Sub' $'dest\tdisk3'
+PATH=$T/lateparent:$PATH bash "$ENGINE" move-run; rc=$?
+check "a file that appears at a parent path is a live skip, not a failed rsync" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 1 && $(st skipped) == 1 && -f "$T/mnt/disk1/movies/Coll/Sub/f" ]] && grep -q "SKIP.*movies/Coll/Sub" "$T/rb.log"'
+
 echo "== browse.php"
 make_fixture
 printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"

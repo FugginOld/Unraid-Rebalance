@@ -329,8 +329,9 @@ read_selection() {   # $RUN/selection.tsv -> SEL_ITEMS ("disk<TAB>rel"), SEL_DES
   (( ${#SEL_ITEMS[@]} )) || die "Bad selection: no item to move"
   (( ${#SEL_DESTS[@]} )) || die "Bad selection: no destination disk"
 }
-unit_conflict() {   # src dst rel -> 0 when moving rel would meet a file at the same path on dst, or a file where a folder is (or the reverse)
-  local s=$MNT/$1/$3 d=$MNT/$2/$3 t p
+unit_conflict() {   # src dst rel -> 0 when moving rel would meet a file at the same path on dst, or a file where a folder is (or the reverse), or a file or link where dst needs a folder above rel
+  local s=$MNT/$1/$3 d=$MNT/$2/$3 t p=$3
+  while [[ $p == */* ]]; do p=${p%/*}; [[ -L $MNT/$2/$p || ( -e $MNT/$2/$p && ! -d $MNT/$2/$p ) ]] && return 0; done   # rsync would fail on a file there, or write through a link
   [[ -e $d || -L $d ]] || return 1
   while IFS= read -r -d '' p; do
     t=${p%% *}; p=${p#* }; p=$d${p:+/$p}
