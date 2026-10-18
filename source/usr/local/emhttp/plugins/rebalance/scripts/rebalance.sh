@@ -18,6 +18,7 @@ CFG=${RB_CFG:-/boot/config/plugins/$PLUGIN/$PLUGIN.cfg}
 DEFAULT_CFG=$EMHTTP/default.cfg
 RUN=${RB_RUN:-/var/local/$PLUGIN}
 LOG=${RB_LOG:-/var/log/$PLUGIN.log}
+HIST=${RB_HIST:-/boot/config/plugins/$PLUGIN/history}   # job history: one folder per finished real run, on the flash drive
 MNT=${RB_MNT:-/mnt}
 VAR_INI=${RB_VAR_INI:-/var/local/emhttp/var.ini}
 SHARE_CFG_DIR=${RB_SHARE_CFG:-/boot/config}
@@ -279,7 +280,7 @@ run_rsync() {  # src dst rel
 history() {  # idx result reason kib src dst start end rel
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$@" >> "$RUN/history.tsv"
 }
-write_move_script() {  # plan.tsv -> moves.sh: the dry run's moves as the exact commands, to read; nothing runs it
+write_move_script() {  # [out] plan.tsv -> moves.sh (or out): the planned moves as the exact commands, to read; nothing runs it
   local idx sz src dst rel
   { printf '%s\n' '#!/bin/bash' \
       '# Array Rebalance - move plan from a dry run, for review only.' \
@@ -293,7 +294,7 @@ write_move_script() {  # plan.tsv -> moves.sh: the dry run's moves as the exact 
       rsync_argv "$src" "$dst" "$rel"
       printf '\n# %s  %s  %s -> %s\n%s\n' "$idx" "$(human "$sz")" "$MNT/$src/$rel" "$MNT/$dst/" "$RSYNC_LINE"
     done < "$RUN/plan.tsv"
-  } > "$RUN/moves.sh"
+  } > "${1:-$RUN/moves.sh}"
 }
 
 ############################## DATA MOVE ##############################
@@ -451,6 +452,39 @@ plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Wri
   fi
 }
 
+############################## JOB HISTORY ##############################
+archive_run() {   # result -> $HIST/<started>-<mode>/ (meta, history.tsv, moves.sh, rebalance.log), built in a temp folder and renamed into place. Sets LAST_ID; returns 1 when any step fails
+  local s=${ST[started]:-$EPOCHSECONDS} tmp=$HIST/.tmp-$$
+  LAST_ID=""
+  while [[ -e $HIST/$s-$MODE ]]; do (( s++ )); done   # a run started in the same second as an archived one: never replace it
+  log "Saving the job history: $HIST/$s-$MODE"
+  rm -rf "$tmp"
+  if mkdir -p "$tmp" \
+    && printf '%s\n' "mode=$MODE" "started=${ST[started]}" "ended=$EPOCHSECONDS" "result=$1" "msg=${ST[msg]//$'\n'/ }" \
+         "plan_count=${ST[plan_count]:-0}" "plan_kib=${ST[plan_kib]:-0}" "done_count=${ST[done_count]:-0}" \
+         "done_kib=${ST[done_kib]:-0}" "skipped=${ST[skipped]:-0}" > "$tmp/meta" \
+    && { [[ ! -s $RUN/plan.tsv ]] || write_move_script "$tmp/moves.sh"; } \
+    && { [[ ! -f $RUN/history.tsv ]] || cp "$RUN/history.tsv" "$tmp/history.tsv"; } \
+    && cp "$LOG" "$tmp/rebalance.log" \
+    && mv -T "$tmp" "$HIST/$s-$MODE"; then
+    LAST_ID=$s-$MODE; return 0
+  fi
+  rm -rf "$tmp"; return 1
+}
+finish_run() {   # a real run is over: archive it, clear the run files, leave the page idle with last_* for the banner
+  local res msg
+  case $FINAL in
+    error) res=error; msg="Error - check the job history: ${ST[msg]}" ;;
+    stopped|aborted) res=$FINAL; msg="Stopped - see job history" ;;
+    *) if (( ${ST[skipped]:-0} )) || { $MOVE && (( plan_skipped + plan_left )); }; then   # a file skipped in the move loop; for a Data Move also an item left out or behind. Array Rebalance plan_skipped is not an error
+         res=error; msg="Finished, but some items were not moved - check the job history: ${ST[msg]}"
+       else res=success; msg="Move successful - ${ST[msg]}"; fi ;;
+  esac
+  if ! archive_run "$res"; then msg+=" - history could not be saved"; log "WARNING: could not save the job history to $HIST"; fi
+  rm -f "$RUN"/{control,plan.tsv,history.tsv,start.tsv,reads.prev,moves.sh}
+  ST=(); st_set state idle last_mode "$MODE" last_result "$res" last_msg "$msg" last_id "$LAST_ID"
+}
+
 ############################## MAIN ##############################
 case $MODE in plan|run|move-plan|move-run) ;; *) echo "usage: $0 plan|run|move-plan|move-run" >&2; exit 2 ;; esac
 [[ $EUID -eq 0 || -n $RB_MNT ]] || { echo "must run as root" >&2; exit 1; }
@@ -467,7 +501,10 @@ load_cfg
 on_exit() {
   restore_wm
   rm -f "$RUN/progress" "$RUN"/cand.* "$RUN/pid"
-  [[ -z $FINAL ]] && st_set state error msg "Engine stopped unexpectedly - see log"
+  [[ -z $FINAL ]] && { FINAL=error; st_set state error msg "Engine stopped unexpectedly - see log"; }
+  [[ $MODE == run || $MODE == move-run ]] || return 0   # dry runs are never archived
+  [[ $FINAL == done && ${plan_count:-0} == 0 ]] && return 0   # "Nothing to move": shown as today, not archived
+  finish_run
 }
 trap on_exit EXIT
 trap 'log "ABORT requested - stopping now"; FINAL=aborted; st_set state aborted msg "Aborted by user"; exit 143' TERM INT HUP

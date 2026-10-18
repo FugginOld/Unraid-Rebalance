@@ -22,6 +22,8 @@ check() { if eval "$2"; then pass "$1"; else fail "$1"; fi; }
 st() { sed -n "s/^$1=//p" "$T/run/status" 2>/dev/null; }
 started() { for _ in $(seq 40); do [[ -n $(st state) ]] && return; sleep 0.25; done; }   # status is written after the engine clears the control file
 sel() { printf '%s\n' "$@" > "$T/run/selection.tsv"; }   # Data Move: one selection.tsv line per argument
+arch() { printf '%s' "$T/hist/$(st last_id)"; }   # the job history folder of the last finished real run
+meta() { sed -n "s/^$1=//p" "$(arch)/meta" 2>/dev/null; }
 
 make_fixture() {
   rm -rf "$T/mnt" "$T/run" "$T/sizes" "$T/cfg" "$T/bin" "$T/notify.log"
@@ -57,7 +59,7 @@ EOF
   printf 'TOLERANCE_PCT="5"\nMIN_FREE_GB="0"\nSKIP_RECENT_MIN="15"\nNOTIFY="false"\r\n' > "$T/rb.cfg"
 }
 
-export RB_MNT=$T/mnt RB_RUN=$T/run RB_LOG=$T/rb.log RB_VAR_INI=$T/var.ini RB_SHARE_CFG=$T/cfg RB_CFG=$T/rb.cfg RB_NOTIFY_BIN=$T/bin/notify
+export RB_MNT=$T/mnt RB_RUN=$T/run RB_LOG=$T/rb.log RB_HIST=$T/hist RB_VAR_INI=$T/var.ini RB_SHARE_CFG=$T/cfg RB_CFG=$T/rb.cfg RB_NOTIFY_BIN=$T/bin/notify
 export PATH=$T/bin:$PATH
 
 echo "== rsync keeps the source of a file it skips as already existing"
@@ -99,18 +101,20 @@ EOF
 chmod +x "$T/argv/rsync"
 PATH=$T/argv:$PATH bash "$ENGINE" run; rc=$?
 check "run exits 0"                          '[[ $rc == 0 ]]'
-check "state is done"                        '[[ $(st state) == done ]]'
+check "a finished run leaves the page idle with a successful last run" '[[ $(st state) == idle && -z $(st msg) && -z $(st mode) && $(st last_mode) == run && $(st last_result) == success && $(st last_msg) == "Move successful - 1 of 1 moved"* ]]'
 check "item arrived on disk4"                '[[ -f "$T/mnt/disk4/movies/Movie One (2020)/data.bin" ]]'
 check "item gone from disk1"                 '[[ ! -e "$T/mnt/disk1/movies/Movie One (2020)" ]]'
 check "run executes the pinned rsync command" '[[ $(cat "$T/rsync.argv" 2>/dev/null) == "$(printf "%s\n" rsync -aHAX --remove-source-files --relative --ignore-existing --info=progress2 --no-inc-recursive "$T/mnt/disk1/./movies/Movie One (2020)" "$T/mnt/disk4/")" ]]'
 check "empty folder stays on disk1 after the run" '[[ -d "$T/mnt/disk1/movies/Empty Folder" ]]'
 while IFS= read -r l; do a=(); eval "a=($l)" 2>/dev/null; printf '%s\n' "${a[@]}"; done < <(grep '^rsync ' "$T/dry-moves.sh" 2>/dev/null) > "$T/script.argv"
 check "move script commands are the commands the run executed" '[[ -s $T/script.argv ]] && cmp -s "$T/script.argv" "$T/rsync.argv"'
-check "history records the move"             'grep -q "	done	" "$T/run/history.tsv"'
+check "the archived history records the move" 'grep -q "	done	" "$(arch)/history.tsv"'
+check "the run is archived with its meta, move script and log" '[[ $(st last_id) == "$(meta started)-run" && $(meta result) == success && $(meta done_count) == 1 && $(meta plan_count) == 1 && $(grep -c "^rsync " "$(arch)/moves.sh" 2>/dev/null) == 1 && -s $(arch)/rebalance.log ]]'
+check "the run files are cleared"            '[[ ! -e $T/run/plan.tsv && ! -e $T/run/history.tsv && ! -e $T/run/start.tsv && ! -e $T/run/moves.sh ]]'
 check "pid file cleaned up"                  '[[ ! -f $T/run/pid ]]'
 json=$(php "$STATUS")
-check "status.php returns valid JSON with state done" \
-  'python3 -c "import json,sys; d=json.loads(sys.argv[1]); assert d[\"state\"]==\"done\" and d[\"done\"][\"count\"]==1 and len(d[\"disks\"])==4" "$json"'
+check "status.php returns valid JSON with state idle and a clean page" \
+  'python3 -c "import json,sys; d=json.loads(sys.argv[1]); assert d[\"state\"]==\"idle\" and d[\"done\"][\"count\"]==0 and d[\"plan\"][\"count\"]==0 and len(d[\"disks\"])==4" "$json"'
 
 echo "== a file that appears on the destination during a move is never overwritten"
 make_fixture
@@ -123,10 +127,10 @@ exec "$REAL_RSYNC" "\$@"
 EOF
 chmod +x "$T/clash/rsync"
 PATH=$T/clash:$PATH bash "$ENGINE" run; rc=$?
-check "a clash found mid-move stops the run with an error" '[[ $rc == 1 && $(st state) == error ]]'
+check "a clash found mid-move stops the run with an error" '[[ $rc == 1 && $(st state) == idle && $(st last_result) == error && $(meta result) == error ]]'
 check "the clashing destination file is kept" '[[ $(cat "$T/mnt/disk4/movies/Movie One (2020)/data.bin" 2>/dev/null) == clash ]]'
 check "the source copy is kept" '[[ $(stat -c %s "$T/mnt/disk1/movies/Movie One (2020)/data.bin" 2>/dev/null) == 409600 ]]'
-check "the error says the source is still there, not a bare rsync exit 0" '[[ $(st msg) == "Move failed (source still present - did a file appear on the destination?): "* ]] && grep -q "$(printf "\tfail\tsource still present")" "$T/run/history.tsv"'
+check "the error says the source is still there, not a bare rsync exit 0" '[[ $(meta msg) == "Move failed (source still present - did a file appear on the destination?): "* && $(st last_msg) == "Error - check the job history: Move failed (source still present"* ]] && grep -q "$(printf "\tfail\tsource still present")" "$(arch)/history.tsv"'
 
 echo "== dry run on a balanced array"
 make_fixture; rm -rf "$T"/mnt/disk*/*               # empty disks: nothing is over target
@@ -220,7 +224,7 @@ echo "== data move: a folder"
 make_fixture
 sel $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk3'
 bash "$ENGINE" move-run; rc=$?
-check "move-run of a folder ends done in mode move-run" '[[ $rc == 0 && $(st state) == done && $(st mode) == move-run ]]'
+check "move-run of a folder ends idle and successful, archived as a move-run" '[[ $rc == 0 && $(st state) == idle && $(st last_mode) == move-run && $(st last_result) == success && $(st last_id) == *-move-run && $(meta mode) == move-run ]]'
 check "the folder lands at the same path on the destination" '[[ -f "$T/mnt/disk3/movies/Movie One (2020)/data.bin" ]]'
 check "the folder is gone from the source" '[[ ! -e "$T/mnt/disk1/movies/Movie One (2020)" ]]'
 check "the log names the run a data move" 'grep -q "Data Move - mode: move-run" "$T/rb.log"'
@@ -229,7 +233,7 @@ echo "== data move: a single file"
 make_fixture
 sel $'item\tdisk1\tmovies/Movie One (2020)/data.bin' $'dest\tdisk3'
 bash "$ENGINE" move-run; rc=$?
-check "a single file moves to the same path" '[[ $rc == 0 && $(st state) == done && -f "$T/mnt/disk3/movies/Movie One (2020)/data.bin" && ! -e "$T/mnt/disk1/movies/Movie One (2020)/data.bin" ]]'
+check "a single file moves to the same path" '[[ $rc == 0 && $(st last_result) == success && -f "$T/mnt/disk3/movies/Movie One (2020)/data.bin" && ! -e "$T/mnt/disk1/movies/Movie One (2020)/data.bin" ]]'
 
 echo "== data move: a whole share spreads over two destinations"
 make_fixture
@@ -258,24 +262,24 @@ make_fixture
 echo 1000 > "$T/sizes/disk2"   # room for Movie One (404) but not Show A (604)
 sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk2'
 bash "$ENGINE" move-run; rc=$?
-check "an item that does not fit fails the plan with an error" '[[ $rc == 1 && $(st state) == error && $(st msg) == "1 item(s) cannot be moved"* ]]'
+check "an item that does not fit fails the plan with an error" '[[ $rc == 1 && $(st last_result) == error && $(meta msg) == "1 item(s) cannot be moved"* ]]'
 check "the log lists the item that does not fit" 'grep -q "PLAN-NOFIT.*tv/Show A (2001)" "$T/rb.log"'
 check "nothing moves when any item does not fit" '[[ -d "$T/mnt/disk1/movies/Movie One (2020)" && ! -e "$T/mnt/disk2/movies/Movie One (2020)" ]]'
-check "a failed plan still writes the move script" '[[ -s $T/run/moves.sh ]]'
+check "a failed plan's move script is archived" '[[ -s $(arch)/moves.sh ]]'
 
 echo "== data move: merge into a folder already on the destination"
 make_fixture
 mv "$T/mnt/disk2/tv/Show A (2001)/data.bin" "$T/mnt/disk2/tv/Show A (2001)/e02.bin"
 sel $'item\tdisk1\ttv/Show A (2001)' $'dest\tdisk2' $'dest\tdisk3'
 bash "$ENGINE" move-run; rc=$?
-check "a destination already holding the item folder is preferred over a roomier one" '[[ $(cut -f4 "$T/run/plan.tsv") == disk2 ]]'
-check "the item merges into the existing folder" '[[ $rc == 0 && $(st state) == done && -f "$T/mnt/disk2/tv/Show A (2001)/data.bin" && -f "$T/mnt/disk2/tv/Show A (2001)/e02.bin" && ! -e "$T/mnt/disk1/tv/Show A (2001)" ]]'
+check "a destination already holding the item folder is preferred over a roomier one" '[[ $(cut -f6 "$(arch)/history.tsv") == disk2 ]]'
+check "the item merges into the existing folder" '[[ $rc == 0 && $(st last_result) == success && -f "$T/mnt/disk2/tv/Show A (2001)/data.bin" && -f "$T/mnt/disk2/tv/Show A (2001)/e02.bin" && ! -e "$T/mnt/disk1/tv/Show A (2001)" ]]'
 
 echo "== data move: a same-named file on the destination"
 make_fixture
 sel $'item\tdisk1\ttv/Show A (2001)' $'dest\tdisk2'
 bash "$ENGINE" move-run; rc=$?
-check "a same-named file on the destination fails the plan" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-CONFLICT.*already exists at the same path on disk2" "$T/rb.log"'
+check "a same-named file on the destination fails the plan" '[[ $rc == 1 && $(st last_result) == error ]] && grep -q "PLAN-CONFLICT.*already exists at the same path on disk2" "$T/rb.log"'
 check "a conflict moves nothing and keeps both copies" '[[ $(stat -c %s "$T/mnt/disk1/tv/Show A (2001)/data.bin") == 614400 && $(stat -c %s "$T/mnt/disk2/tv/Show A (2001)/data.bin") == 40960 ]]'
 
 echo "== data move: a file on the destination where the source has a folder"
@@ -297,7 +301,7 @@ mv "$T/mnt/disk2/tv/Show A (2001)/data.bin" "$T/mnt/disk2/tv/Show A (2001)/e02.b
 touch -h -d '2 hours ago' "$T/mnt/disk2/tv/Show A (2001)"   # the rename touched the folder; age it like the fixture
 sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk2\ttv/Show A (2001)' $'dest\tdisk3'
 bash "$ENGINE" move-run; rc=$?
-check "a folder split across two disks gathers on one" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 2 && -f "$T/mnt/disk3/tv/Show A (2001)/data.bin" && -f "$T/mnt/disk3/tv/Show A (2001)/e02.bin" && ! -e "$T/mnt/disk1/tv/Show A (2001)" && ! -e "$T/mnt/disk2/tv/Show A (2001)" ]]'
+check "a folder split across two disks gathers on one" '[[ $rc == 0 && $(st last_result) == success && $(meta done_count) == 2 && -f "$T/mnt/disk3/tv/Show A (2001)/data.bin" && -f "$T/mnt/disk3/tv/Show A (2001)/e02.bin" && ! -e "$T/mnt/disk1/tv/Show A (2001)" && ! -e "$T/mnt/disk2/tv/Show A (2001)" ]]'
 
 echo "== data move: a conflict that appears after planning"
 make_fixture
@@ -311,7 +315,7 @@ EOF
 chmod +x "$T/late/rsync"
 sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk1\tmovies/Movie One (2020)' $'dest\tdisk3'
 PATH=$T/late:$PATH bash "$ENGINE" move-run; rc=$?
-check "a conflict that appears after planning is skipped live" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 1 && $(st skipped) == 1 ]] && grep -q "SKIP.*Movie One (2020).*a file already exists" "$T/rb.log"'
+check "a conflict that appears after planning is skipped live and the run ends as an error" '[[ $rc == 0 && $(st last_result) == error && $(meta done_count) == 1 && $(meta skipped) == 1 && $(st last_msg) == "Finished, but some items were not moved - check the job history: 1 of 2 moved"* ]] && grep -q "SKIP.*Movie One (2020).*a file already exists" "$T/rb.log"'
 check "a live-skipped item keeps both copies" '[[ $(cat "$T/mnt/disk3/movies/Movie One (2020)/data.bin") == late && -s "$T/mnt/disk1/movies/Movie One (2020)/data.bin" ]]'
 
 echo "== data move: two ticked disks never swap the same path"
@@ -337,7 +341,7 @@ echo loose > "$T/mnt/disk1/tv/loose.nfo"; ln -s ../movies "$T/mnt/disk1/tv/movie
 find "$T/mnt/disk1/tv" -exec touch -h -d '2 hours ago' {} +
 sel $'item\tdisk1\ttv' $'dest\tdisk3'
 bash "$ENGINE" move-run; rc=$?
-check "a file above Item depth in a ticked share moves" '[[ $rc == 0 && $(st state) == done && $(cat "$T/mnt/disk3/tv/loose.nfo" 2>/dev/null) == loose && ! -e $T/mnt/disk1/tv/loose.nfo ]]'
+check "a file above Item depth in a ticked share moves" '[[ $rc == 0 && $(st last_result) == success && $(cat "$T/mnt/disk3/tv/loose.nfo" 2>/dev/null) == loose && ! -e $T/mnt/disk1/tv/loose.nfo ]]'
 check "a link above Item depth in a ticked share moves as a link" '[[ -L "$T/mnt/disk3/tv/movies link" && ! -L "$T/mnt/disk1/tv/movies link" ]]'
 
 echo "== data move: a broken link above Item depth is a link like any other"
@@ -347,7 +351,7 @@ ln -s nowhere "$T/mnt/disk1/tv/broken link"
 find "$T/mnt/disk1/tv" -exec touch -h -d '2 hours ago' {} +
 sel $'item\tdisk1\ttv' $'dest\tdisk3'
 bash "$ENGINE" move-run; rc=$?
-check "a broken link moves as a link instead of being skipped as 'no longer exists'" '[[ $rc == 0 && $(st state) == done && $(st skipped) == 0 && -L "$T/mnt/disk3/tv/broken link" && ! -L "$T/mnt/disk1/tv/broken link" ]]'
+check "a broken link moves as a link instead of being skipped as 'no longer exists'" '[[ $rc == 0 && $(st last_result) == success && $(meta skipped) == 0 && -L "$T/mnt/disk3/tv/broken link" && ! -L "$T/mnt/disk1/tv/broken link" ]]'
 
 echo "== data move: hidden entries, odd names and files outside shares are left behind, with a warning"
 make_fixture
@@ -358,9 +362,9 @@ echo h > "$T/mnt/disk2/movies/.hidden"; echo r > "$T/mnt/disk2/.Recycle.Bin/r"; 
 find "$T/mnt/disk2" -exec touch -h -d '2 hours ago' {} +
 sel $'item\tdisk2\t' $'dest\tdisk3'
 bash "$ENGINE" move-run; rc=$?
-check "a whole disk still moves its shares' items" '[[ $rc == 0 && $(st state) == done && -d "$T/mnt/disk3/movies/Movie Three" && ! -e "$T/mnt/disk2/movies/Movie Three" ]]'
+check "a whole disk still moves its shares' items" '[[ $rc == 0 && $(st state) == idle && -d "$T/mnt/disk3/movies/Movie Three" && ! -e "$T/mnt/disk2/movies/Movie Three" ]]'
 check "hidden entries, odd names and files outside shares stay, each logged" '[[ -f $T/mnt/disk2/movies/.hidden && -f $T/mnt/disk2/.Recycle.Bin/r && -f $T/mnt/disk2/rootfile && -f "$T/mnt/disk2/movies/Odd${TAB}Name/t" && $(grep -c "PLAN-LEFT" "$T/rb.log") == 4 ]]'
-check "a move that leaves things behind ends as a warning that says so" '[[ $(st warn) == 1 && $(st msg) == *"4 left behind"* ]] && grep -q -- "-i warning" "$T/notify.log"'
+check "a move that leaves things behind ends as an error that says so" '[[ $(st last_result) == error && $(st last_msg) == "Finished, but some items were not moved - check the job history: "*", 4 left behind - see log" ]] && grep -q -- "-i warning" "$T/notify.log"'
 
 echo "== data move: the left-behind list in the log is capped"
 make_fixture
@@ -375,7 +379,7 @@ make_fixture
 sed -i 's/NOTIFY="false"/NOTIFY="true"/' "$T/rb.cfg"
 sel $'item\tdisk1\t' $'dest\tdisk3' $'dest\tdisk4'   # disk1's hardlinked pair (Movie Two, downloads/seed.bin) is left out
 bash "$ENGINE" move-run; rc=$?
-check "a move-run that left items out ends as a warning that counts them" '[[ $rc == 0 && $(st state) == done && $(st warn) == 1 && $(st msg) == *", 2 left out - see log" ]] && grep -q -- "-i warning" "$T/notify.log" && ! grep -q -- "-i normal" "$T/notify.log"'
+check "a move-run that left items out ends as an error that counts them" '[[ $rc == 0 && $(st last_result) == error && $(meta msg) == *", 2 left out - see log" ]] && grep -q -- "-i warning" "$T/notify.log" && ! grep -q -- "-i normal" "$T/notify.log"'
 
 echo "== data move: a file or a link where the destination needs a folder above the item"
 make_fixture
@@ -387,7 +391,7 @@ bash "$ENGINE" move-plan; rc=$?
 check "a file at a parent path on the destination fails the dry run" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-CONFLICT.*movies/Coll/Sub" "$T/rb.log"'
 rm "$T/mnt/disk3/movies/Coll"; mkdir -p "$T/outside"; ln -s "$T/outside" "$T/mnt/disk3/movies/Coll"   # a link there: rsync would write through it
 bash "$ENGINE" move-run; rc=$?
-check "a link at a parent path on the destination fails the plan, nothing is written through it" '[[ $rc == 1 && $(st state) == error && -z $(ls -A "$T/outside") && -f "$T/mnt/disk1/movies/Coll/Sub/f" ]]'
+check "a link at a parent path on the destination fails the plan, nothing is written through it" '[[ $rc == 1 && $(st last_result) == error && -z $(ls -A "$T/outside") && -f "$T/mnt/disk1/movies/Coll/Sub/f" ]]'
 
 echo "== data move: a file that appears at a parent path after planning is skipped live"
 make_fixture
@@ -403,7 +407,7 @@ EOF
 chmod +x "$T/lateparent/rsync"
 sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk1\tmovies/Coll/Sub' $'dest\tdisk3'
 PATH=$T/lateparent:$PATH bash "$ENGINE" move-run; rc=$?
-check "a file that appears at a parent path is a live skip, not a failed rsync" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 1 && $(st skipped) == 1 && -f "$T/mnt/disk1/movies/Coll/Sub/f" ]] && grep -q "SKIP.*movies/Coll/Sub" "$T/rb.log"'
+check "a file that appears at a parent path is a live skip, not a failed rsync" '[[ $rc == 0 && $(st last_result) == error && $(meta done_count) == 1 && $(meta skipped) == 1 && -f "$T/mnt/disk1/movies/Coll/Sub/f" ]] && grep -q "SKIP.*movies/Coll/Sub" "$T/rb.log"'
 
 echo "== data move: units that share a hardlinked file are each sized in full"
 make_fixture
@@ -411,6 +415,42 @@ echo 'SKIP_HARDLINKED="false"' >> "$T/rb.cfg"   # both halves of disk1's hardlin
 sel $'item\tdisk1\tmovies/Movie Two' $'item\tdisk1\tdownloads/seed.bin' $'dest\tdisk3'
 bash "$ENGINE" move-plan; rc=$?
 check "units that share a hardlinked file are each sized in full" '[[ $rc == 0 && $(st state) == planned && $(cut -f2 "$T/run/plan.tsv") == "$(printf "304\n300")" ]]'
+
+echo "== job history: dry runs and runs with nothing to move are not archived"
+make_fixture
+RB_HIST=$T/h-none bash "$ENGINE" plan; rc=$?
+check "a dry run is not archived" '[[ $rc == 0 && $(st state) == planned && ! -e $T/h-none ]]'
+sel $'item\tdisk1\tmovies/Nope' $'dest\tdisk3'
+RB_HIST=$T/h-none bash "$ENGINE" move-plan; rc=$?
+check "a dry run that errors is not archived and keeps its error" '[[ $rc == 1 && $(st state) == error && $(st msg) == "Bad selection"* && ! -e $T/h-none ]]'
+rm -rf "$T"/mnt/disk*/*
+RB_HIST=$T/h-none bash "$ENGINE" run; rc=$?
+check "a run with nothing to move is not archived and keeps its message" '[[ $rc == 0 && $(st state) == done && $(st msg) == *"already balanced"* && ! -e $T/h-none ]]'
+
+echo "== job history: a run that fails before planning is archived"
+make_fixture
+sed -i 's/^mdState=.*/mdState="STOPPED"/' "$T/var.ini"
+bash "$ENGINE" move-run; rc=$?
+check "a run on a stopped array is archived as an error" '[[ $rc == 1 && $(st state) == idle && $(st last_result) == error && $(st last_msg) == "Error - check the job history: Array is not started" && $(meta result) == error && -s $(arch)/rebalance.log && ! -e $(arch)/moves.sh ]]'
+
+echo "== job history: an rsync failure stops the run and is archived"
+make_fixture
+mkdir -p "$T/fail"; printf '#!/bin/bash\nexit 23\n' > "$T/fail/rsync"; chmod +x "$T/fail/rsync"
+PATH=$T/fail:$PATH bash "$ENGINE" run; rc=$?
+check "an rsync failure is archived as an error with the failed file" '[[ $rc == 1 && $(st last_result) == error && $(meta msg) == "Move failed (rsync exit 23): "* ]] && grep -q "$(printf "\tfail\trsync exit 23\t")" "$(arch)/history.tsv"'
+
+echo "== job history: a failed archive still clears the run"
+make_fixture
+touch "$T/hist-file"   # a file where the history folder's parent should be: no folder can be made under it, even as root
+RB_HIST=$T/hist-file/history bash "$ENGINE" run; rc=$?
+check "a failed archive still ends idle with the result and says history could not be saved" '[[ $rc == 0 && $(st state) == idle && $(st last_result) == success && -z $(st last_id) && $(st last_msg) == "Move successful - "*" - history could not be saved" && ! -e $T/run/plan.tsv ]] && grep -q "WARNING: could not save the job history" "$T/rb.log"'
+
+echo "== job history: a run started in the same second as an archived run keeps both"
+make_fixture
+now=$EPOCHSECONDS; mkdir -p "$T/col"
+for s in $(seq "$now" $(( now + 5 ))); do mkdir -p "$T/col/$s-run"; done   # every id the run can get in the next 5 s is taken
+RB_HIST=$T/col bash "$ENGINE" run; rc=$?
+check "a taken id is never replaced: the run gets the next free second" '[[ $rc == 0 && $(st last_id) == "$(( now + 6 ))-run" && -s $T/col/$(st last_id)/meta && $(ls "$T/col" | wc -l) == 7 && -z $(find "$T/col" -mindepth 2 ! -path "*/$(( now + 6 ))-run/*") ]]'
 
 echo "== browse.php"
 make_fixture
@@ -471,8 +511,8 @@ check "pause time accumulated on resume"     '(( $(st paused_s) >= 2 )) && [[ -z
 check "status.php: no pending request after resume" 'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"request\"]==\"\""'
 echo stop > "$T/run/control"; n=$(st done_count)     # read after the request: only the move in flight may still finish
 check "moves remain after the stop request"  '(( $(st plan_count) - n >= 2 ))'
-for _ in $(seq 40); do [[ $(st state) == running ]] || break; sleep 0.5; done
-check "stopped after the current move"       '[[ $(st state) == stopped ]] && (( $(st done_count) - n <= 1 ))'
+for _ in $(seq 40); do [[ $(st state) == idle ]] && break; sleep 0.5; done
+check "stopped after the current move"       '[[ $(st last_result) == stopped && $(st last_msg) == "Stopped - see job history" ]] && (( $(meta done_count) - n <= 1 ))'
 
 echo "== parity check pause"
 make_fixture extra
@@ -503,8 +543,8 @@ PATH=$T/race:$T/slow:$PATH setsid bash "$ENGINE" run & started
 ctl pause
 for _ in $(seq 20); do [[ $(st state) == paused ]] && break; sleep 0.5; done
 np=$(st done_count); ctl resume
-for _ in $(seq 40); do [[ $(st state) == running || $(st state) == paused ]] || break; sleep 0.5; done
-check "a stop sent right after resume is kept" '[[ $(st state) == stopped ]] && (( $(st done_count) - np <= 1 ))'
+for _ in $(seq 40); do [[ $(st state) == idle ]] && break; sleep 0.5; done
+check "a stop sent right after resume is kept" '[[ $(st last_result) == stopped ]] && (( $(meta done_count) - np <= 1 ))'
 pid=$(cat "$T/run/pid" 2>/dev/null); [[ -n $pid ]] && kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
 
 echo "== the current move shows its rsync command"
@@ -527,7 +567,8 @@ make_fixture extra
 PATH=$T/slow:$PATH setsid bash "$ENGINE" run & sleep 2
 pid=$(cat "$T/run/pid" 2>/dev/null)
 kill -TERM -- "-$pid" 2>/dev/null; sleep 1.5
-check "state is aborted"                     '[[ $(st state) == aborted ]]'
+for _ in $(seq 20); do [[ $(st state) == idle ]] && break; sleep 0.25; done
+check "an abort is archived and leaves the page idle" '[[ $(st state) == idle && $(st last_result) == aborted && $(meta result) == aborted && $(st last_msg) == "Stopped - see job history" ]]'
 check "engine process group is gone"         '[[ -z $(ps -eo pgid=,stat= | awk -v g="$pid" '"'"'$1==g && $2 !~ /Z/'"'"') ]]'    # zombies await reaping by init
 check "pid file cleaned up"                  '[[ ! -f $T/run/pid ]]'
 
