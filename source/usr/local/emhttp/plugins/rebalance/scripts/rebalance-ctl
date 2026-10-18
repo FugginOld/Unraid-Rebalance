@@ -1,5 +1,5 @@
 #!/bin/bash
-# rebalance-ctl plan|run|move-plan|move-run|pause|resume|stop|abort|status
+# rebalance-ctl plan|run|move-plan|move-run|pause|resume|stop|abort|dismiss|status
 #   plan       start a dry run (plan only)
 #   run        plan, then move data
 #   move-plan  Data Move dry run of /var/local/rebalance/selection.tsv (written by action.php)
@@ -8,9 +8,10 @@
 #   resume  continue after a pause
 #   stop    finish the current move, then end the run
 #   abort   stop immediately (the item being moved is left split across two disks)
+#   dismiss clear a finished run's banner, an end message or a dry run's plan (refused while the engine holds its lock)
 PLUGIN=rebalance
 EMHTTP=/usr/local/emhttp/plugins/$PLUGIN
-RUN=/var/local/$PLUGIN
+RUN=${RB_RUN:-/var/local/$PLUGIN}   # RB_RUN: tests only
 mkdir -p "$RUN"
 pid=$(cat "$RUN/pid" 2>/dev/null)
 running() { [[ $pid =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; }
@@ -30,8 +31,14 @@ case $1 in
     running || { echo "Nothing is running"; exit 1; }
     kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid"
     echo "Abort sent" ;;
+  dismiss)
+    exec 9>"$RUN/lock"
+    flock -n 9 || { echo "A rebalance is running"; exit 1; }   # the engine holds this lock for its whole life: never race one that is starting
+    rm -f "$RUN"/{control,progress,plan.tsv,history.tsv,start.tsv,reads.prev,moves.sh}
+    printf 'state=idle\nupdated=%s\n' "$EPOCHSECONDS" > "$RUN/status.tmp" && mv -f "$RUN/status.tmp" "$RUN/status"
+    echo "Dismissed" ;;
   status)
     running && echo "running (pid $pid)" || echo "idle" ;;
   *)
-    echo "usage: ${0##*/} plan|run|move-plan|move-run|pause|resume|stop|abort|status"; exit 2 ;;
+    echo "usage: ${0##*/} plan|run|move-plan|move-run|pause|resume|stop|abort|dismiss|status"; exit 2 ;;
 esac

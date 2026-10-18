@@ -12,6 +12,7 @@ STATUS=$PLUG/include/status.php
 SCRIPT=$PLUG/include/script.php
 BROWSE=$PLUG/include/browse.php
 ACTION=$PLUG/include/action.php
+CTL=$PLUG/scripts/rebalance-ctl
 T=$(mktemp -d)
 trap 'pkill -f "$T" 2>/dev/null; rm -rf "$T"' EXIT
 FAILS=0
@@ -488,6 +489,20 @@ for bad in '../many' '1700-run/..' '1700-RUN' 'x-run' '' '1800-run'; do
   check "status.php?run= refuses the id '$bad'" 'runq "$T/many" "$bad" "$STATUS" | python3 -c "import json,sys; assert json.load(sys.stdin)[\"ok\"] is False"'
 done
 
+echo "== rebalance-ctl dismiss"
+make_fixture
+bash "$ENGINE" plan
+out=$(bash "$CTL" dismiss); rc=$?
+check "dismiss clears a dry run's plan and leaves an idle status with no other key" '[[ $rc == 0 && $out == Dismissed && $(cut -d= -f1 "$T/run/status" | sort | tr "\n" " ") == "state updated " && $(st state) == idle && ! -e $T/run/plan.tsv && ! -e $T/run/moves.sh && ! -e $T/run/start.tsv ]]'
+bash "$ENGINE" run; id=$(st last_id)
+bash "$CTL" dismiss >/dev/null
+check "dismiss drops the last run's keys and keeps its archive" '[[ -n $id && -s $T/hist/$id/meta && $(cut -d= -f1 "$T/run/status" | sort | tr "\n" " ") == "state updated " ]]'
+make_fixture; bash "$ENGINE" plan
+( exec 9>"$T/run/lock"; flock 9; sleep 3 ) & lk=$!; sleep 0.5   # holds the engine's lock, like an engine that is starting
+out=$(bash "$CTL" dismiss); rc=$?
+check "dismiss refuses while the engine lock is held and changes nothing" '[[ $rc == 1 && $out == "A rebalance is running" && $(st state) == planned && -s $T/run/plan.tsv ]]'
+wait "$lk"
+
 echo "== browse.php"
 make_fixture
 printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"
@@ -517,6 +532,9 @@ check "action.php refuses an item with a symlink above it" '[[ $j == *"\"ok\":fa
 rm -f "$T/ctl.argv"
 j=$(act action=move-plan 'items=[{"disk":"disk1","rel":"movies/Movie One (2020)"},{"disk":"disk2","rel":""}]' 'dests=["disk3","disk4"]')
 check "action.php writes the selection and starts move-plan" '[[ $j == *"\"ok\":true"* && $(cat "$T/ctl.argv") == move-plan && $(cat "$T/run/selection.tsv") == "$(printf "item\tdisk1\tmovies/Movie One (2020)\nitem\tdisk2\t\ndest\tdisk3\ndest\tdisk4")" ]]'
+rm -f "$T/ctl.argv"
+j=$(act action=dismiss)
+check "action.php passes dismiss to rebalance-ctl" '[[ $j == *"\"ok\":true"* && $(cat "$T/ctl.argv") == dismiss ]]'
 unset RB_CTL
 
 echo "== pause / resume / stop"

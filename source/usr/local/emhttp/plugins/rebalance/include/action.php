@@ -45,7 +45,7 @@ if ($action === 'move-plan' || $action === 'move-run') {   /* Data Move: validat
     reply(false, 'Could not write the selection', 500);
 }
 
-if (in_array($action, ['plan', 'run', 'move-plan', 'move-run', 'pause', 'resume', 'stop', 'abort'], true)) {
+if (in_array($action, ['plan', 'run', 'move-plan', 'move-run', 'pause', 'resume', 'stop', 'abort', 'dismiss'], true)) {
   $out = [];
   exec(escapeshellarg($ctl) . ' ' . escapeshellarg($action) . ' 2>&1', $out, $rc);
   reply($rc === 0, implode("\n", $out));
