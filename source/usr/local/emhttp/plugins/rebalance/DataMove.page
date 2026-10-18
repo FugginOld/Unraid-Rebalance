@@ -280,7 +280,7 @@ Markdown="false"
 
   function renderSelection(o, P) {   // Selecting: the cards show the ticked selection and a live preview of the plan
     var n = P.units.length;
-    if (!o.other && o.state !== 'error' && o.state !== 'stale') {
+    if (!o.other && !o.last && o.state !== 'error' && o.state !== 'stale') {   // a finished run's banner stays until dismissed
       if (n && !P.dests.length) R.setMsg('Tick at least one destination disk.', 'warn');
       else if (P.unfit.length) R.setMsg(P.unfit.length + ' item' + (P.unfit.length === 1 ? '' : 's') + ' (' + fmtKiB(P.unfitKiB) + ') won\u2019t fit on the ticked destinations above the minimum free space, or a ticked destination holds a ticked item at that path.' + (P.approx ? ' Some ticked folders are not expanded yet, so this is a rough preview - the dry run is exact.' : ''), 'warn');
       else if (!n && !o.msg) R.setMsg('Tick what to move in Source, then where it goes in Destination.');

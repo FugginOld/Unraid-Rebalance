@@ -10,6 +10,8 @@ window.RB = window.RB || (function () {
     paused: ['Paused', 'warn'], stopped: ['Stopped', ''], done: ['Done', 'ok'], aborted: ['Aborted', 'bad'],
     error: ['Error', 'bad'], stale: ['Engine not running', 'bad']
   };
+  var LAST = { success: ['Move successful', 'ok'], error: ['Error', 'bad'], stopped: ['Stopped', ''], aborted: ['Stopped', ''] };   // the idle page after a real run: pill and banner, by status.php last.result
+  var RESULT = { success: 'Successful', error: 'Error', stopped: 'Stopped', aborted: 'Aborted' };   // a job history entry
   var views = [], busy = false, last = null, csrf = '';
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -68,7 +70,12 @@ window.RB = window.RB || (function () {
       var b = el('button', 'rb-btn' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.disabled = !!disabled;
       b.addEventListener('click', function () { act(action); }); return b;
     }
-    function own(d) {   // a run of the other tab's kind shows here as idle; d.other holds its state while it is active
+    function dismissBtn() {   // in the message line: clears the banner or an end message (rebalance-ctl dismiss)
+      var b = el('button', 'lnk', 'Dismiss'); b.type = 'button';
+      b.addEventListener('click', function () { act('dismiss'); }); return b;
+    }
+    function own(d) {   // a run of the other tab's kind shows here as idle; d.other holds its state while it is active. last and runs: this tab's kind only
+      d = Object.assign({}, d, { last: d.last && isMove(d.last.mode) === !!page.move ? d.last : null, runs: (d.runs || {})[page.move ? 'move' : 'rebalance'] || [] });
       if (!d.mode || isMove(d.mode) === !!page.move) return d;
       return Object.assign({}, d, {
         state: 'idle', msg: '', warn: false, request: '', pause_reason: '', started: null, updated: null,
@@ -88,7 +95,7 @@ window.RB = window.RB || (function () {
     }
 
     function renderHead(d) {
-      var s = STATES[d.state] || [d.state, ''];
+      var s = d.state === 'idle' && d.last ? LAST[d.last.result] || STATES.idle : STATES[d.state] || [d.state, ''];
       var warn = d.state === 'done' && d.warn;   // done, but look: "Nothing can be moved", or a data move that left items out or behind
       var label = s[0];
       if (d.state === 'paused' && d.pause_reason && d.pause_reason !== 'user') label = 'Paused \u00b7 ' + d.pause_reason;
@@ -101,7 +108,7 @@ window.RB = window.RB || (function () {
       if (d.started) {
         meta.push((active ? 'Started ' : 'Last run started ') + fmtTime(d.started));
         if (active) meta.push('Elapsed ' + fmtDur(activeSecs(d)) + (d.paused_s ? ' (+' + fmtDur(d.paused_s) + ' paused)' : ''));
-      } else meta.push('No run yet');
+      } else meta.push(d.runs.length ? 'Ready for the next job' : 'No run yet');
       if (d.updated && active) meta.push('Updated ' + fmtDur(d.now - d.updated) + ' ago');
       $('meta').textContent = meta.join(' \u00b7 ');
 
@@ -120,10 +127,12 @@ window.RB = window.RB || (function () {
         a.append(button('Abort', 'abort', 'danger'));
       } else {
         page.idle(d).forEach(function (b) { a.append(button(b[0], b[1], b[2], b[3] || !!d.other)); });
+        if (d.state === 'planned') a.append(button('Discard', 'dismiss', '', !!d.other));   // drops the dry run's plan and script
       }
       if (d.other) setMsg(page.otherBusy, 'warn', otherLink());
-      else if (d.state === 'error' || d.state === 'stale') setMsg(d.msg || 'The engine stopped unexpectedly - check the log.', 'bad');
-      else setMsg(d.msg || '', warn ? 'warn' : '');
+      else if (d.state === 'idle' && d.last) setMsg(d.last.msg, (LAST[d.last.result] || STATES.idle)[1], dismissBtn());
+      else if (d.state === 'error' || d.state === 'stale') setMsg(d.msg || 'The engine stopped unexpectedly - check the log.', 'bad', d.state === 'error' ? dismissBtn() : null);
+      else setMsg(d.msg || '', warn ? 'warn' : '', d.msg && ['done', 'aborted', 'stopped'].indexOf(d.state) >= 0 ? dismissBtn() : null);   // a dry run's end or "Nothing to move": stays until dismissed
     }
 
     function chip(k, v, s) {
