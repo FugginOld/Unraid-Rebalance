@@ -452,6 +452,25 @@ for s in $(seq "$now" $(( now + 5 ))); do mkdir -p "$T/col/$s-run"; done   # eve
 RB_HIST=$T/col bash "$ENGINE" run; rc=$?
 check "a taken id is never replaced: the run gets the next free second" '[[ $rc == 0 && $(st last_id) == "$(( now + 6 ))-run" && -s $T/col/$(st last_id)/meta && $(ls "$T/col" | wc -l) == 7 && -z $(find "$T/col" -mindepth 2 ! -path "*/$(( now + 6 ))-run/*") ]]'
 
+echo "== job history: the newest 20 runs of each kind are kept"
+make_fixture
+mkdir -p "$T/ret/notes"
+for i in $(seq 1000 1019); do mkdir -p "$T/ret/$i-run"; echo result=success > "$T/ret/$i-run/meta"; done
+for i in 1000 1001 1002; do mkdir -p "$T/ret/$i-move-run"; echo result=success > "$T/ret/$i-move-run/meta"; done
+RB_HIST=$T/ret bash "$ENGINE" run; rc=$?
+check "the 21st run deletes only the oldest run of its kind" '[[ $rc == 0 && $(ls "$T/ret" | grep -cxE "[0-9]+-run") == 20 && ! -e $T/ret/1000-run && -d $T/ret/1001-run && -s $T/ret/$(st last_id)/meta ]]'
+check "retention leaves the other kind and other names alone" '[[ $(ls "$T/ret" | grep -cxE "[0-9]+-move-run") == 3 && -d $T/ret/notes ]]'
+
+echo "== job history: an abort that arrives while the run is being archived is ignored"
+make_fixture
+REAL_CP=$(command -v cp); mkdir -p "$T/slowcp"
+printf '#!/bin/bash\n[[ $* == *rebalance.log* ]] && sleep 2\nexec "%s" "$@"\n' "$REAL_CP" > "$T/slowcp/cp"; chmod +x "$T/slowcp/cp"   # copying the log into the archive takes 2 s
+rm -f "$T/rb.log"   # the wait below must see this run's log line, not an earlier run's
+PATH=$T/slowcp:$PATH bash "$ENGINE" run & epid=$!
+for _ in $(seq 40); do grep -q "Saving the job history" "$T/rb.log" 2>/dev/null && break; sleep 0.1; done
+kill -TERM "$epid" 2>/dev/null; wait "$epid"
+check "a late abort neither cuts the archive short nor marks a finished run aborted" '[[ $(st state) == idle && $(st last_result) == success && -s $(arch)/rebalance.log ]]'
+
 echo "== browse.php"
 make_fixture
 printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"

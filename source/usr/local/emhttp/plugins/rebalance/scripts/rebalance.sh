@@ -471,6 +471,12 @@ archive_run() {   # result -> $HIST/<started>-<mode>/ (meta, history.tsv, moves.
   fi
   rm -rf "$tmp"; return 1
 }
+prune_history() {   # keep the newest 20 runs of this mode
+  local f n=0
+  while IFS= read -r f; do
+    (( ++n > 20 )) && rm -rf "${HIST:?}/$f"
+  done < <(ls -1 "$HIST" | grep -xE "[0-9]+-$MODE" | sort -t- -k1,1nr)
+}
 finish_run() {   # a real run is over: archive it, clear the run files, leave the page idle with last_* for the banner
   local res msg
   case $FINAL in
@@ -480,7 +486,8 @@ finish_run() {   # a real run is over: archive it, clear the run files, leave th
          res=error; msg="Finished, but some items were not moved - check the job history: ${ST[msg]}"
        else res=success; msg="Move successful - ${ST[msg]}"; fi ;;
   esac
-  if ! archive_run "$res"; then msg+=" - history could not be saved"; log "WARNING: could not save the job history to $HIST"; fi
+  if archive_run "$res"; then prune_history
+  else msg+=" - history could not be saved"; log "WARNING: could not save the job history to $HIST"; fi
   rm -f "$RUN"/{control,plan.tsv,history.tsv,start.tsv,reads.prev,moves.sh}
   ST=(); st_set state idle last_mode "$MODE" last_result "$res" last_msg "$msg" last_id "$LAST_ID"
 }
@@ -499,6 +506,7 @@ rm -f "$RUN"/{control,progress,plan.tsv,history.tsv,start.tsv,reads.prev,moves.s
 load_cfg
 
 on_exit() {
+  trap '' TERM INT HUP   # the run is ending: a late abort must not cut the archive short
   restore_wm
   rm -f "$RUN/progress" "$RUN"/cand.* "$RUN/pid"
   [[ -z $FINAL ]] && { FINAL=error; st_set state error msg "Engine stopped unexpectedly - see log"; }
