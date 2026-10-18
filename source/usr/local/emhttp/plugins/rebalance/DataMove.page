@@ -212,7 +212,7 @@ Markdown="false"
       outgoing[u.n.disk] += u.n.kib; srcs[u.n.disk] = 1; held[u.n.disk + '|' + u.n.rel] = u.approx ? 2 : 1;   // an unopened folder is split into its items by the engine, so it only sits above them
       for (var p = u.n.rel; p.indexOf('/') !== -1; ) { p = p.slice(0, p.lastIndexOf('/')); held[u.n.disk + '|' + p] = 2; }
     });
-    function near(disk, rel) {   // the engine's ticked_near: disk holds a ticked unit at, inside or above rel, so sending rel there would swap
+    function near(disk, rel) {   // the engine's ticked_near: disk holds a ticked unit at, inside or above rel, so sending rel there would swap. shortcut: the same unopened folder ticked on two disks is refused whole here, while the engine splits it and refuses only items present on both - open the folder for an exact preview
       if (held[disk + '|' + rel]) return true;
       for (var p = rel; p.indexOf('/') !== -1; ) { p = p.slice(0, p.lastIndexOf('/')); if (held[disk + '|' + p] === 1) return true; }
       return false;
