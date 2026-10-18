@@ -211,7 +211,9 @@ window.RB = window.RB || (function () {
       $('h-meta').textContent = d.done.count || d.done.skipped ? d.done.count + ' done' + (d.done.skipped ? ' \u00b7 ' + d.done.skipped + ' skipped' : '') : '';
       var h = $('hist'); h.textContent = '';
       if (!d.history.length) h.append(el('div', 'empty', 'Nothing yet.'));
-      d.history.forEach(function (x) {
+      d.history.forEach(function (x) { h.append(histItem(x)); });
+    }
+    function histItem(x) {   // one per-file result: the live Recently completed list and an expanded job history entry
         var it = el('div', 'item'), l = el('div'); l.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:0';
         var icon = x.result === 'done' ? svg('M3 8.5l3.2 3L13 4.5', 'var(--green)') : x.result === 'skip' ? svg('M4 8h8', 'var(--amber-t)') : svg('M4 4l8 8M12 4l-8 8', 'var(--red-t)');
         var txt = el('div'); txt.style.minWidth = '0';
@@ -219,7 +221,43 @@ window.RB = window.RB || (function () {
         l.append(icon, txt);
         var stat = x.result === 'done' ? fmtKiB(x.kib) + ' \u00b7 ' + fmtDur(x.secs) + (x.secs ? ' \u00b7 ' + fmtRate(x.kib * 1024 / x.secs) : '') : x.result === 'skip' ? 'skipped' : 'failed';
         var s = el('div', 'mono soft', stat); s.style.cssText = 'font-size:12px;white-space:nowrap;text-align:right';
-        it.append(l, s); h.append(it);
+        it.append(l, s); return it;
+    }
+
+    var runsKey = null;   // the pane is rebuilt only when its list changes, so an expanded entry stays open between polls
+    function renderRuns(d) {
+      var key = d.runs.map(function (r) { return r.id; }).join(' ');
+      if (key === runsKey) return;
+      runsKey = key;
+      $('runs-meta').textContent = d.runs.length ? 'last ' + d.runs.length + (d.runs.length === 1 ? ' run' : ' runs') : '';
+      var box = $('runs'); box.textContent = '';
+      if (!d.runs.length) { box.append(el('div', 'empty', 'No finished jobs yet.')); return; }
+      d.runs.forEach(function (r) {
+        var det = el('details', 'run'), sum = el('summary'), l = el('div'), txt = el('div'), body = el('div', 'body');
+        l.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:0'; txt.style.minWidth = '0';
+        var icon = r.result === 'success' ? svg('M3 8.5l3.2 3L13 4.5', 'var(--green)') : r.result === 'error' ? svg('M4 4l8 8M12 4l-8 8', 'var(--red-t)') : svg('M4 8h8', 'var(--amber-t)');
+        txt.append(el('div', 't', fmtTime(r.started)), el('div', 'r', (RESULT[r.result] || r.result) + ' 00b7 ' + r.done_count + ' of ' + r.plan_count + ' moved' + (r.skipped ? ' 00b7 ' + r.skipped + ' skipped' : '')));
+        l.append(svg('M6 4l4 4-4 4', 'var(--muted)'), icon, txt);
+        var sz = el('div', 'mono soft', fmtKiB(r.done_kib)); sz.style.cssText = 'font-size:12px;white-space:nowrap';
+        sum.append(l, sz); det.append(sum, body);
+        det.addEventListener('toggle', function () {
+          if (!det.open || body.childNodes.length) return;   // filled once, on the first open
+          var q = '?run=' + encodeURIComponent(r.id), links = el('div', 'links'), list = el('div', 'list');
+          var sc = el('a', null, 'Move script'); sc.href = BASE + 'script.php' + q; sc.target = '_blank'; sc.rel = 'noopener';
+          var lg = el('a', null, 'Log'); lg.href = BASE + 'log.php' + q;
+          links.append(sc, lg); list.append(el('div', 'empty', 'Loading2026'));
+          body.append(el('div', 'r', r.msg), links, list);
+          fetch(BASE + 'status.php' + q, { cache: 'no-store' }).then(function (x) { return x.json(); })
+            .then(function (j) {
+              if (!j.ok) throw j;
+              list.textContent = '';
+              if (!j.files.length) list.append(el('div', 'empty', 'No files were moved.'));
+              j.files.forEach(function (x) { list.append(histItem(x)); });
+              if (j.total > j.files.length) list.append(el('div', 'empty', '+ ' + (j.total - j.files.length) + ' more - see the log'));
+            })
+            .catch(function () { list.textContent = ''; list.append(el('div', 'empty', 'Could not load this run.')); });
+        });
+        box.append(det);
       });
     }
 
@@ -243,7 +281,7 @@ window.RB = window.RB || (function () {
     function render(d) {
       if (!d) { setMsg('Could not reach the status endpoint - retrying', 'bad'); return; }
       var o = own(d);
-      renderHead(o); renderChips(o); renderOverall(o); renderCurrent(o); renderLists(o); renderLog(o);
+      renderHead(o); renderChips(o); renderOverall(o); renderCurrent(o); renderLists(o); renderRuns(o); renderLog(o);
       page.render(o);
     }
 

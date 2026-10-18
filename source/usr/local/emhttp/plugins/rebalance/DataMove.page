@@ -49,6 +49,11 @@ Markdown="false"
     </section>
   </div>
 
+  <section class="card">
+    <div class="cardhead"><h2 class="h2">Job history</h2><span class="muted" id="dm-runs-meta" style="font-size:13px"></span></div>
+    <div class="list" id="dm-runs"></div>
+  </section>
+
   <div class="row panes">
     <section class="card pane">
       <div class="cardhead">

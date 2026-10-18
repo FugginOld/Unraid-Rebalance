@@ -72,6 +72,11 @@ Markdown="false"
     </div>
   </div>
 
+  <section class="card">
+    <div class="cardhead"><h2 class="h2">Job history</h2><span class="muted" id="rb-runs-meta" style="font-size:13px"></span></div>
+    <div class="list" id="rb-runs"></div>
+  </section>
+
   <section class="logbox">
     <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="label">Log</h2><span style="display:flex;gap:16px;flex-wrap:wrap"><a id="rb-script" href="/plugins/rebalance/include/script.php" target="_blank" rel="noopener" hidden>View move script</a><a href="/plugins/rebalance/include/log.php">Download full log</a></span></div>
     <div class="loglines" id="rb-log"></div>

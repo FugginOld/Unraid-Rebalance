@@ -72,6 +72,14 @@
 .rb .list .item .t{font-size:14px;font-weight:500} .rb .list .item .r{font-family:var(--mono);font-size:12px;color:var(--muted)}
 .rb .list .empty{color:var(--muted);padding:6px 0;border-top:1px solid var(--line)}
 .rb .msg.ok{border-color:var(--green);color:var(--green-t)}
+.rb details.run{background:none;border:0;border-top:1px solid var(--line);border-radius:0;padding:0}
+.rb details.run>summary{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;font:500 14px var(--sans);list-style:none}
+.rb details.run>summary::-webkit-details-marker{display:none}
+.rb details.run>summary .t{font-size:14px;font-weight:500}
+.rb details.run>summary .r,.rb details.run .body>.r{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.rb details.run>summary>div:first-child>.ico:first-child{transition:transform .15s} .rb details.run[open]>summary>div:first-child>.ico:first-child{transform:rotate(90deg)}
+.rb details.run .body{display:flex;flex-direction:column;gap:6px;padding:0 0 8px 26px}
+.rb details.run .links{display:flex;gap:16px;font-size:13px}
 .rb .ico{flex:none}
 .rb .logbox{background:var(--deep);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;gap:6px}
 .rb .loglines{font-family:var(--mono);font-size:12.5px;color:var(--soft);display:flex;flex-direction:column;gap:2px;overflow-x:auto}
