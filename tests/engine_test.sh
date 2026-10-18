@@ -12,6 +12,7 @@ STATUS=$PLUG/include/status.php
 SCRIPT=$PLUG/include/script.php
 BROWSE=$PLUG/include/browse.php
 ACTION=$PLUG/include/action.php
+LOGPHP=$PLUG/include/log.php
 CTL=$PLUG/scripts/rebalance-ctl
 T=$(mktemp -d)
 trap 'pkill -f "$T" 2>/dev/null; rm -rf "$T"' EXIT
@@ -502,6 +503,17 @@ make_fixture; bash "$ENGINE" plan
 out=$(bash "$CTL" dismiss); rc=$?
 check "dismiss refuses while the engine lock is held and changes nothing" '[[ $rc == 1 && $out == "A rebalance is running" && $(st state) == planned && -s $T/run/plan.tsv ]]'
 wait "$lk"
+
+echo "== job history: script.php and log.php serve an archived run"
+make_fixture
+bash "$ENGINE" run; id=$(st last_id)
+check "script.php?run= serves that run's move script" '[[ -s $T/hist/$id/moves.sh && $(runq "$T/hist" "$id" "$SCRIPT") == "$(cat "$T/hist/$id/moves.sh")" ]]'
+check "log.php?run= serves that run's log" '[[ -s $T/hist/$id/rebalance.log && $(runq "$T/hist" "$id" "$LOGPHP") == "$(cat "$T/hist/$id/rebalance.log")" ]]'
+check "log.php without an id still serves the current log" '[[ -s $T/rb.log && $(php "$LOGPHP") == "$(cat "$T/rb.log")" ]]'
+for bad in '../hist' "$id/../$id" $'\n'"$id" "$id"$'\n' ''; do
+  b=${bad//$id/<id>}; b=${b//$'\n'/\\n}   # the check's name, without this run's id
+  check "script.php and log.php refuse the id '$b'" '[[ $(runq "$T/hist" "$bad" "$SCRIPT") == "Bad run id" && $(runq "$T/hist" "$bad" "$LOGPHP") == "Bad run id" ]]'
+done
 
 echo "== browse.php"
 make_fixture
