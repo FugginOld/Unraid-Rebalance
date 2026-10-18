@@ -471,6 +471,23 @@ for _ in $(seq 40); do grep -q "Saving the job history" "$T/rb.log" 2>/dev/null 
 kill -TERM "$epid" 2>/dev/null; wait "$epid"
 check "a late abort neither cuts the archive short nor marks a finished run aborted" '[[ $(st state) == idle && $(st last_result) == success && -s $(arch)/rebalance.log ]]'
 
+echo "== job history: status.php"
+make_fixture
+bash "$ENGINE" run
+check "status.php reports the last run and lists it first on its tab" 'php "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); l=d[\"last\"]; r=d[\"runs\"][\"rebalance\"][0]; assert l[\"result\"]==\"success\" and l[\"mode\"]==\"run\" and l[\"msg\"].startswith(\"Move successful - \") and r[\"id\"]==l[\"id\"] and r[\"result\"]==\"success\" and r[\"done_count\"]==1 and r[\"plan_count\"]==1 and r[\"done_kib\"]>0 and r[\"started\"]>0, d[\"last\"]"'
+bash "$ENGINE" plan
+check "status.php has no last run once a new run starts" 'php "$STATUS" | python3 -c "import json,sys; assert json.load(sys.stdin)[\"last\"] is None"'
+mkdir -p "$T/many/1500-run" "$T/many/1600-run" "$T/many/.tmp-1"; echo result=error > "$T/many/1500-run/meta"   # 1600-run has no meta file
+for i in $(seq 1000 1021); do mkdir -p "$T/many/$i-move-run"; printf 'result=success\nstarted=%s\n' "$i" > "$T/many/$i-move-run/meta"; done
+check "status.php lists at most 20 runs per tab, newest first, and only folders with a meta file" 'RB_HIST=$T/many php "$STATUS" | python3 -c "import json,sys; r=json.load(sys.stdin)[\"runs\"]; m=[x[\"id\"] for x in r[\"move\"]]; assert len(m)==20 and m[0]==\"1021-move-run\" and m[-1]==\"1002-move-run\" and [x[\"id\"] for x in r[\"rebalance\"]]==[\"1500-run\"], r"'
+runq() { RB_HIST=$1 php -r '$_GET = ["run" => $argv[1]]; include $argv[2];' -- "$2" "$3"; }   # an endpoint with ?run=<id>, against history folder $1
+mkdir -p "$T/many/1700-run"; echo result=error > "$T/many/1700-run/meta"
+{ for i in $(seq 600); do printf '%s\tdone\t\t4\tdisk1\tdisk2\t0\t1\tm/f%s\n' "$i" "$i"; done; printf '601\tskip\tfile open\t4\tdisk1\tdisk2\t0\t1\tm/s\n'; } > "$T/many/1700-run/history.tsv"
+check "status.php?run= lists skips first and caps the list at 500 lines" 'runq "$T/many" 1700-run "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); f=d[\"files\"]; assert d[\"ok\"] and d[\"total\"]==601 and len(f)==500 and f[0][\"result\"]==\"skip\" and f[0][\"reason\"]==\"file open\" and f[1][\"result\"]==\"done\", d[\"total\"]"'
+for bad in '../many' '1700-run/..' '1700-RUN' 'x-run' '' '1800-run'; do
+  check "status.php?run= refuses the id '$bad'" 'runq "$T/many" "$bad" "$STATUS" | python3 -c "import json,sys; assert json.load(sys.stdin)[\"ok\"] is False"'
+done
+
 echo "== browse.php"
 make_fixture
 printf 'EXCLUDE_SHARES="downloads"\nEXCLUDE_DISKS="disk4"\n' >> "$T/rb.cfg"

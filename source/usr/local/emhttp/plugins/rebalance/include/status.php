@@ -7,6 +7,7 @@ $mnt        = getenv('RB_MNT') ?: '/mnt';
 $varIni     = getenv('RB_VAR_INI') ?: '/var/local/emhttp/var.ini';
 $cfgFile    = getenv('RB_CFG') ?: "/boot/config/plugins/$plugin/$plugin.cfg";
 $defaultCfg = __DIR__ . '/../default.cfg';
+$hist       = getenv('RB_HIST') ?: "/boot/config/plugins/$plugin/history";
 require __DIR__ . '/common.php';
 
 header('Content-Type: application/json');
@@ -19,6 +20,23 @@ function lines($f) {
 function pid_alive($pid) {
   $pid = trim((string)$pid);
   return $pid !== '' && ctype_digit($pid) && file_exists("/proc/$pid");
+}
+function hist_row($l) {   /* one history.tsv line -> one per-file result, or null */
+  $f = explode("\t", $l, 9);
+  if (count($f) < 9) return null;
+  return ['idx' => (int)$f[0], 'result' => $f[1], 'reason' => $f[2], 'kib' => (int)$f[3], 'src' => $f[4],
+          'dst' => $f[5], 'secs' => max(0, (int)$f[7] - (int)$f[6]), 'rel' => $f[8], 'title' => basename($f[8])];
+}
+
+/* ---------- ?run=<id>: one archived run's per-file results, skips and failures first, at most 500 ---------- */
+if (isset($_GET['run'])) {
+  $id = $_GET['run'];
+  if (!run_id_ok($id) || !is_dir("$hist/$id")) { http_response_code(404); echo json_encode(['ok' => false, 'msg' => 'No such run']); exit; }
+  $bad = []; $good = [];
+  foreach (lines("$hist/$id/history.tsv") as $l) if ($h = hist_row($l)) { if ($h['result'] === 'done') $good[] = $h; else $bad[] = $h; }
+  echo json_encode(['ok' => true, 'total' => count($bad) + count($good), 'files' => array_slice(array_merge($bad, $good), 0, 500)],
+                   JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+  exit;
 }
 
 $st    = kv_file("$run/status");
@@ -37,10 +55,7 @@ foreach (lines("$run/plan.tsv") as $l) {
 }
 $history = []; $handled = []; $doneKib = 0; $doneCount = 0; $skipped = 0; $failed = 0;
 foreach (lines("$run/history.tsv") as $l) {
-  $f = explode("\t", $l, 9);
-  if (count($f) < 9) continue;
-  $h = ['idx' => (int)$f[0], 'result' => $f[1], 'reason' => $f[2], 'kib' => (int)$f[3], 'src' => $f[4],
-        'dst' => $f[5], 'secs' => max(0, (int)$f[7] - (int)$f[6]), 'rel' => $f[8], 'title' => basename($f[8])];
+  if (!($h = hist_row($l))) continue;
   $history[] = $h;
   $handled[$h['idx']] = true;
   if ($h['result'] === 'done') { $doneKib += $h['kib']; $doneCount++; }
@@ -140,6 +155,20 @@ if ($current) {  /* reconstruct write reads every data disk; read/modify/write r
   }
 }
 
+/* ---------- job history: finished real runs on the flash drive, newest first, at most 20 per tab ---------- */
+$runs = ['rebalance' => [], 'move' => []];
+$ids = array_filter(@scandir($hist) ?: [], 'run_id_ok');
+usort($ids, function ($a, $b) { return (int)$b <=> (int)$a; });
+foreach ($ids as $id) {
+  $kind = preg_match('/^[0-9]+-move-run\z/', $id) ? 'move' : (preg_match('/^[0-9]+-run\z/', $id) ? 'rebalance' : '');
+  if ($kind === '' || count($runs[$kind]) >= 20) continue;
+  $m = kv_file("$hist/$id/meta");
+  if (!isset($m['result'])) continue;
+  $runs[$kind][] = ['id' => $id, 'started' => (int)($m['started'] ?? 0), 'ended' => (int)($m['ended'] ?? 0), 'result' => $m['result'],
+                    'msg' => $m['msg'] ?? '', 'plan_count' => (int)($m['plan_count'] ?? 0), 'done_count' => (int)($m['done_count'] ?? 0),
+                    'done_kib' => (int)($m['done_kib'] ?? 0), 'skipped' => (int)($m['skipped'] ?? 0)];
+}
+
 /* ---------- log tail ---------- */
 $log = [];
 if (is_readable($logFile)) exec('tail -n 14 ' . escapeshellarg($logFile), $log);
@@ -150,6 +179,9 @@ echo json_encode([
   'mode'       => $st['mode'] ?? null,
   'msg'        => $st['msg'] ?? '',
   'warn'       => ($st['warn'] ?? '') === '1',
+  'last'       => isset($st['last_result']) ? ['result' => $st['last_result'], 'msg' => $st['last_msg'] ?? '',
+                                               'id' => $st['last_id'] ?? '', 'mode' => $st['last_mode'] ?? ''] : null,
+  'runs'       => $runs,
   'pause_reason' => $st['pause_reason'] ?? '',
   'paused_s'   => (int)($st['paused_s'] ?? 0) + ($state === 'paused' && !empty($st['paused_since']) ? max(0, time() - (int)$st['paused_since']) : 0),
   'request'    => $alive && in_array($req = trim((string)@file_get_contents("$run/control")), ['pause', 'stop'], true) ? $req : '',

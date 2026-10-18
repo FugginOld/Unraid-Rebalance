@@ -14,6 +14,8 @@ function kv_file($f) {
   }
   return $out;
 }
+/* a job history run id, <start epoch>-<mode>: the only form ever put into a path under the history folder (\z: a trailing newline is refused) */
+function run_id_ok($id) { return is_string($id) && preg_match('/^[0-9]+-[a-z-]+\z/', $id) === 1; }
 function csv($s) { return array_values(array_filter(array_map('trim', explode(',', (string)$s)), 'strlen')); }
 /* a path relative to a disk: '' (the disk itself) or names joined by '/', with no empty, '.' or '..' part and no NUL, newline or tab */
 function rel_ok($p) {
