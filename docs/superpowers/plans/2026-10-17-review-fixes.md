@@ -1,5 +1,7 @@
 # Data Move review fixes (branch `dev`, tip 176022c)
 
+> **Status: complete (2026-10-17).** Tasks 1-8 are committed on `dev`, the Checkpoint and the final review were done, and #7 stays deferred (Decision 9). Not part of this plan: the later fixes in `413d979`, `7b3fbed` and `ea9787a`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax. Dispatch each task to the `executor` agent (it pins its own model); the checkpoint is run by the main session with the user.
 
 **Goal:** fix the confirmed findings of the branch review of the Data Move feature (swap between ticked disks, silent leftovers, a summary that hides left-out items, parent-path conflicts, a symlinked source parent, hardlink sizing, a misleading error text), document what stays as is, and prepare the changelog. Finding #7 (selection.tsv race) is deferred, with the reason under Decisions.
@@ -86,7 +88,7 @@ Run from Git Bash. The sandbox has no rsync, so tests run in the local Docker im
 
 **Files:** `$ENG` (`declare` line, new `ticked_near`, `plan_move`), `$PLUG/DataMove.page` (`plan()`), `tests/engine_test.sh`.
 
-- [ ] **Step 1: Failing tests** — insert before the browse.php section:
+- [x] **Step 1: Failing tests** — insert before the browse.php section:
 
 ```bash
 echo "== data move: two ticked disks never swap the same path"
@@ -105,12 +107,12 @@ bash "$ENGINE" move-plan; rc=$?
 check "with only the two ticked disks as destinations the plan fails instead of swapping" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-NOFIT.*disk1/tv/Show A (2001)" "$T/rb.log"'
 ```
 
-- [ ] **Step 2: Run — expect FAIL.** `RUN_TESTS` must print exactly these FAIL lines, then `3 check(s) failed` and `102 ok`:
+- [x] **Step 2: Run — expect FAIL.** `RUN_TESTS` must print exactly these FAIL lines, then `3 check(s) failed` and `102 ok`:
   - `  FAIL  the same path ticked on two destination disks gathers on a third, never swaps`
   - `  FAIL  a ticked folder and a ticked file inside it on another disk never swap`
   - `  FAIL  with only the two ticked disks as destinations the plan fails instead of swapping`
 
-- [ ] **Step 3: Implement.** Five edits in `$ENG`:
+- [x] **Step 3: Implement.** Five edits in `$ENG`:
 
 old:
 ```
@@ -209,11 +211,11 @@ new:
         if (x.name === n.disk || room[x.name] < n.kib || near(x.name, n.rel)) return;
 ```
 
-- [ ] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `105 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r' "$ENG"` and `grep -c $'\r' "$PLUG/DataMove.page"` → `0` each.
+- [x] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `105 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r' "$ENG"` and `grep -c $'\r' "$PLUG/DataMove.page"` → `0` each.
 
-- [ ] **Step 5: Commit** — `git add "$ENG" "$PLUG/DataMove.page" tests/engine_test.sh && git commit -m "Data Move: never send a path to a disk that holds a ticked item at that path (no swap)"`
+- [x] **Step 5: Commit** — `git add "$ENG" "$PLUG/DataMove.page" tests/engine_test.sh && git commit -m "Data Move: never send a path to a disk that holds a ticked item at that path (no swap)"`
 
-- [ ] **Step 6: Mutations** (file `$ENG`):
+- [x] **Step 6: Mutations** (file `$ENG`):
 ```bash
 sed -i '/# never onto a disk holding a ticked unit/d' "$ENG"
 ```
@@ -235,7 +237,7 @@ The `DataMove.page` mirror has no JS test harness; `RUN_SYNTAX` proves it parses
 
 **Files:** `$ENG` (new `left_behind`, `expand_dir`; `expand_units`; `plan_move` summary; final summary), `$PLUG/DataMove.page` (`units()`), `$INC/common.js` (log colour), `tests/engine_test.sh`.
 
-- [ ] **Step 1: Failing tests** — insert before the browse.php section:
+- [x] **Step 1: Failing tests** — insert before the browse.php section:
 
 ```bash
 echo "== data move: files and links above Item depth move as their own units"
@@ -270,14 +272,14 @@ bash "$ENGINE" move-plan; rc=$?
 check "the log names 50 left-behind entries, then counts the rest" '[[ $rc == 0 && $(st state) == planned && $(grep -c "PLAN-LEFT  /" "$T/rb.log") == 50 && $(st msg) == *"55 left behind"* ]] && grep -q "PLAN-LEFT  \.\.\. and 5 more" "$T/rb.log"'
 ```
 
-- [ ] **Step 2: Run — expect FAIL.** `RUN_TESTS` must print exactly these FAIL lines, then `5 check(s) failed` and `106 ok` (`a whole disk still moves its shares' items` passes on the old code; it guards the rewrite):
+- [x] **Step 2: Run — expect FAIL.** `RUN_TESTS` must print exactly these FAIL lines, then `5 check(s) failed` and `106 ok` (`a whole disk still moves its shares' items` passes on the old code; it guards the rewrite):
   - `  FAIL  a file above Item depth in a ticked share moves`
   - `  FAIL  a link above Item depth in a ticked share moves as a link`
   - `  FAIL  hidden entries, odd names and files outside shares stay, each logged`
   - `  FAIL  a move that leaves things behind ends as a warning that says so`
   - `  FAIL  the log names 50 left-behind entries, then counts the rest`
 
-- [ ] **Step 3: Implement.** Five edits in `$ENG`:
+- [x] **Step 3: Implement.** Five edits in `$ENG`:
 
 old:
 ```
@@ -434,11 +436,11 @@ new:
         var cls = /\bSKIP\b|PLAN-LEFT|PAUSED|WARNING/.test(line)
 ```
 
-- [ ] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `111 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r'` → `0` for `$ENG`, `$PLUG/DataMove.page`, `$INC/common.js`.
+- [x] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `111 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r'` → `0` for `$ENG`, `$PLUG/DataMove.page`, `$INC/common.js`.
 
-- [ ] **Step 5: Commit** — `git add "$ENG" "$PLUG/DataMove.page" "$INC/common.js" tests/engine_test.sh && git commit -m "Data Move: loose files above Item depth move; hidden and odd names are left behind, logged and warned"`
+- [x] **Step 5: Commit** — `git add "$ENG" "$PLUG/DataMove.page" "$INC/common.js" tests/engine_test.sh && git commit -m "Data Move: loose files above Item depth move; hidden and odd names are left behind, logged and warned"`
 
-- [ ] **Step 6: Mutations** (file `$ENG`):
+- [x] **Step 6: Mutations** (file `$ENG`):
 ```bash
 sed -i 's/if (( t == \$2 )) || \[\[ \$y != d \]\]; then/if (( t == $2 )); then/' "$ENG"
 ```
@@ -466,7 +468,7 @@ sed -i 's/elif \[\[ ! -d \$p || -L \$p \]\]; then/elif false; then/' "$ENG"
 
 **Files:** `$ENG` (final summary), `$INC/common.js` (comment), `tests/engine_test.sh`.
 
-- [ ] **Step 1: Failing test** — insert before the browse.php section:
+- [x] **Step 1: Failing test** — insert before the browse.php section:
 
 ```bash
 echo "== data move: a run that left items out says so"
@@ -477,9 +479,9 @@ bash "$ENGINE" move-run; rc=$?
 check "a move-run that left items out ends as a warning that counts them" '[[ $rc == 0 && $(st state) == done && $(st warn) == 1 && $(st msg) == *", 2 left out - see log" ]] && grep -q -- "-i warning" "$T/notify.log" && ! grep -q -- "-i normal" "$T/notify.log"'
 ```
 
-- [ ] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly `  FAIL  a move-run that left items out ends as a warning that counts them`, `1 check(s) failed`, `111 ok`.
+- [x] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly `  FAIL  a move-run that left items out ends as a warning that counts them`, `1 check(s) failed`, `111 ok`.
 
-- [ ] **Step 3: Implement.** One edit in `$ENG`:
+- [x] **Step 3: Implement.** One edit in `$ENG`:
 
 old:
 ```
@@ -505,11 +507,11 @@ new:
       var warn = d.state === 'done' && d.warn;   // done, but look: "Nothing can be moved", or a data move that left items out or behind
 ```
 
-- [ ] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `112 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r'` → `0` for `$ENG` and `$INC/common.js`.
+- [x] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `112 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r'` → `0` for `$ENG` and `$INC/common.js`.
 
-- [ ] **Step 5: Commit** — `git add "$ENG" "$INC/common.js" tests/engine_test.sh && git commit -m "Data Move: a run that left items out ends as a warning that counts them"`
+- [x] **Step 5: Commit** — `git add "$ENG" "$INC/common.js" tests/engine_test.sh && git commit -m "Data Move: a run that left items out ends as a warning that counts them"`
 
-- [ ] **Step 6: Mutations** (file `$ENG`):
+- [x] **Step 6: Mutations** (file `$ENG`):
 ```bash
 sed -i 's/(( plan_skipped )) && summary+=/(( 0 )) \&\& summary+=/' "$ENG"
 ```
@@ -529,7 +531,7 @@ sed -i 's/notify "\$lvl" "Done: /notify normal "Done: /' "$ENG"
 
 **Files:** `$ENG` (`unit_conflict`), `tests/engine_test.sh`.
 
-- [ ] **Step 1: Failing tests** — insert before the browse.php section:
+- [x] **Step 1: Failing tests** — insert before the browse.php section:
 
 ```bash
 echo "== data move: a file or a link where the destination needs a folder above the item"
@@ -561,12 +563,12 @@ PATH=$T/lateparent:$PATH bash "$ENGINE" move-run; rc=$?
 check "a file that appears at a parent path is a live skip, not a failed rsync" '[[ $rc == 0 && $(st state) == done && $(st done_count) == 1 && $(st skipped) == 1 && -f "$T/mnt/disk1/movies/Coll/Sub/f" ]] && grep -q "SKIP.*movies/Coll/Sub" "$T/rb.log"'
 ```
 
-- [ ] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly these, then `3 check(s) failed`, `112 ok`:
+- [x] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly these, then `3 check(s) failed`, `112 ok`:
   - `  FAIL  a file at a parent path on the destination fails the dry run`
   - `  FAIL  a link at a parent path on the destination fails the plan, nothing is written through it`
   - `  FAIL  a file that appears at a parent path is a live skip, not a failed rsync`
 
-- [ ] **Step 3: Implement.** One edit in `$ENG`:
+- [x] **Step 3: Implement.** One edit in `$ENG`:
 
 old:
 ```
@@ -582,11 +584,11 @@ unit_conflict() {   # src dst rel -> 0 when moving rel would meet a file at the 
   [[ -e $d || -L $d ]] || return 1
 ```
 
-- [ ] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `115 ok`. `grep -c $'\r' "$ENG"` → `0`.
+- [x] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `115 ok`. `grep -c $'\r' "$ENG"` → `0`.
 
-- [ ] **Step 5: Commit** — `git add "$ENG" tests/engine_test.sh && git commit -m "Data Move: a file or link at a parent path on the destination is a conflict, at plan time and live"`
+- [x] **Step 5: Commit** — `git add "$ENG" tests/engine_test.sh && git commit -m "Data Move: a file or link at a parent path on the destination is a conflict, at plan time and live"`
 
-- [ ] **Step 6: Mutations** (file `$ENG`):
+- [x] **Step 6: Mutations** (file `$ENG`):
 ```bash
 sed -i '/# rsync would fail on a file there, or write through a link/d' "$ENG"
 ```
@@ -602,7 +604,7 @@ sed -i 's/\[\[ -L \$MNT\/\$2\/\$p || /[[ /' "$ENG"
 
 **Files:** `$ENG` (`read_selection`), `$INC/action.php`, `tests/engine_test.sh` (three edits in existing sections).
 
-- [ ] **Step 1: Failing tests.** Three edits in `tests/engine_test.sh`:
+- [x] **Step 1: Failing tests.** Three edits in `tests/engine_test.sh`:
 
 old:
 ```
@@ -641,11 +643,11 @@ check "action.php refuses an item with a symlink above it" '[[ $j == *"\"ok\":fa
 rm -f "$T/ctl.argv"
 ```
 
-- [ ] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly these, then `2 check(s) failed`, `115 ok`:
+- [x] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly these, then `2 check(s) failed`, `115 ok`:
   - `  FAIL  selection refused (has a symlink above it): item disk1 movies/link/Show B`
   - `  FAIL  action.php refuses an item with a symlink above it`
 
-- [ ] **Step 3: Implement.** One edit in `$ENG`:
+- [x] **Step 3: Implement.** One edit in `$ENG`:
 
 old:
 ```
@@ -669,11 +671,11 @@ new:
     if (($i = strrpos($r, '/')) !== false && realpath("$mnt/$d/" . substr($r, 0, $i)) !== "$root/" . substr($r, 0, $i)) reply(false, "$key has a symlink above it", 400);   /* the move goes to the literal path */
 ```
 
-- [ ] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `117 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r'` → `0` for `$ENG` and `$INC/action.php`.
+- [x] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `117 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r'` → `0` for `$ENG` and `$INC/action.php`.
 
-- [ ] **Step 5: Commit** — `git add "$ENG" "$INC/action.php" tests/engine_test.sh && git commit -m "Data Move: refuse an item whose parent folder is reached through a symlink"`
+- [x] **Step 5: Commit** — `git add "$ENG" "$INC/action.php" tests/engine_test.sh && git commit -m "Data Move: refuse an item whose parent folder is reached through a symlink"`
 
-- [ ] **Step 6: Mutations:**
+- [x] **Step 6: Mutations:**
 ```bash
 sed -i '/has a symlink above it"   # the move goes/d' "$ENG"
 ```
@@ -753,7 +755,7 @@ The old engine prints `disk1>disk2 disk2>disk1` on line 1, no `left behind`/`lef
 
 **Files:** `$ENG` (`expand_units`, last line), `tests/engine_test.sh`.
 
-- [ ] **Step 1: Failing test** — insert before the browse.php section:
+- [x] **Step 1: Failing test** — insert before the browse.php section:
 
 ```bash
 echo "== data move: units that share a hardlinked file are each sized in full"
@@ -764,9 +766,9 @@ bash "$ENGINE" move-plan; rc=$?
 check "units that share a hardlinked file are each sized in full" '[[ $rc == 0 && $(st state) == planned && $(cut -f2 "$T/run/plan.tsv") == "$(printf "304\n300")" ]]'
 ```
 
-- [ ] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly `  FAIL  units that share a hardlinked file are each sized in full`, `1 check(s) failed`, `117 ok`.
+- [x] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly `  FAIL  units that share a hardlinked file are each sized in full`, `1 check(s) failed`, `117 ok`.
 
-- [ ] **Step 3: Implement.** One edit in `$ENG`:
+- [x] **Step 3: Implement.** One edit in `$ENG`:
 
 old:
 ```
@@ -777,11 +779,11 @@ new:
   xargs -0 -r du -skl --null -- < "$RUN/cand.sel" 2>/dev/null | sort -z -t$'\t' -k1,1nr > "$RUN/cand.units"   # -l: a file hardlinked into two units counts in each (one du run would count it once)
 ```
 
-- [ ] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `118 ok` (the existing hardlink checks `hardlinked items left out (2)` and the stuck-dry-run checks stay `ok`). `grep -c $'\r' "$ENG"` → `0`.
+- [x] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `118 ok` (the existing hardlink checks `hardlinked items left out (2)` and the stuck-dry-run checks stay `ok`). `grep -c $'\r' "$ENG"` → `0`.
 
-- [ ] **Step 5: Commit** — `git add "$ENG" tests/engine_test.sh && git commit -m "Data Move: size each unit in full when units share a hardlinked file"`
+- [x] **Step 5: Commit** — `git add "$ENG" tests/engine_test.sh && git commit -m "Data Move: size each unit in full when units share a hardlinked file"`
 
-- [ ] **Step 6: Mutation:**
+- [x] **Step 6: Mutation:**
 ```bash
 sed -i 's/du -skl --null/du -sk --null/' "$ENG"
 ```
@@ -793,7 +795,7 @@ sed -i 's/du -skl --null/du -sk --null/' "$ENG"
 
 **Files:** `$ENG` (EXECUTE failure branch), `tests/engine_test.sh`, `README.md`.
 
-- [ ] **Step 1: Failing test.** One edit in `tests/engine_test.sh` (section `== a file that appears on the destination during a move is never overwritten`):
+- [x] **Step 1: Failing test.** One edit in `tests/engine_test.sh` (section `== a file that appears on the destination during a move is never overwritten`):
 
 old:
 ```
@@ -806,9 +808,9 @@ check "the error says the source is still there, not a bare rsync exit 0" '[[ $(
 ```
 (The `grep -q` pattern contains two literal TAB characters, before and after `fail`, exactly as the existing check `history records the move` does. If the Edit tool cannot type a TAB, write the pattern as `"$(printf "\tfail\tsource still present")"`.)
 
-- [ ] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly `  FAIL  the error says the source is still there, not a bare rsync exit 0`, `1 check(s) failed`, `118 ok`.
+- [x] **Step 2: Run — expect FAIL.** `RUN_TESTS` → exactly `  FAIL  the error says the source is still there, not a bare rsync exit 0`, `1 check(s) failed`, `118 ok`.
 
-- [ ] **Step 3: Implement.** One edit in `$ENG`:
+- [x] **Step 3: Implement.** One edit in `$ENG`:
 
 old:
 ```
@@ -835,11 +837,11 @@ new:
 **Data Move** (second tab) sends the ticked disks, folders or files to the ticked disks, keeping their paths. A ticked disk, share or folder above `ITEM_DEPTH` splits into its items, plus any file or link that sits above that depth. Items go largest first onto a ticked disk that already holds their folder, else the one with the most room; never back to their own disk, onto a disk ticked in full, or onto a disk that holds a ticked item at the same path. A same-named file on the destination, or a file or link where a folder is needed, fails the dry run and nothing moves. Never moved: hidden entries (such as `.Recycle.Bin`), names containing a tab or line break, files at the disk root and shares excluded in settings — the log lists them as `PLAN-LEFT` and the result is a warning. Folders emptied by a move stay on the source disk; delete them by hand if you want. A name that is not valid UTF-8 shows with `�` in the Source tree and cannot be opened or ticked on its own (the page says it no longer exists); tick its parent folder instead.
 ```
 
-- [ ] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `119 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r'` → `0` for `$ENG`, `tests/engine_test.sh`, `README.md`. `grep -c 'PLAN-LEFT' README.md` → `1`.
+- [x] **Step 4: Run — expect PASS.** `RUN_TESTS` → `all checks passed`, `119 ok`. `RUN_SYNTAX` → `syntax ok`. `grep -c $'\r'` → `0` for `$ENG`, `tests/engine_test.sh`, `README.md`. `grep -c 'PLAN-LEFT' README.md` → `1`.
 
-- [ ] **Step 5: Commit** — `git add "$ENG" tests/engine_test.sh README.md && git commit -m "Say 'source still present' when a move stops on a file that appeared on the destination; document Data Move leftovers"`
+- [x] **Step 5: Commit** — `git add "$ENG" tests/engine_test.sh README.md && git commit -m "Say 'source still present' when a move stops on a file that appeared on the destination; document Data Move leftovers"`
 
-- [ ] **Step 6: Mutation:**
+- [x] **Step 6: Mutation:**
 ```bash
 sed -i 's/(( rc )) || why="source still present/(( 1 )) || why="source still present/' "$ENG"
 ```
@@ -853,13 +855,13 @@ sed -i 's/(( rc )) || why="source still present/(( 1 )) || why="source still pre
 
 **Files:** `rebalance.plg` (`<CHANGES>` only).
 
-- [ ] **Step 1: Choose the version and prove it is absent.** Run:
+- [x] **Step 1: Choose the version and prove it is absent.** Run:
   ```bash
   cd /c/Users/Joe/Documents/GitHub/Unraid-Rebalance && VER=$(date +%Y.%m.%d) && echo "$VER" && git tag -l "$VER" && [[ $VER > 2026.09.28 ]] && echo newer && awk -v v="###$VER###" '$0==v {f=1; next} /^###/ || /<\/CHANGES>/ {f=0} f' rebalance.plg | wc -l
   ```
   Expected: the date (e.g. `2026.10.17`), no tag line, `newer`, then `0` (the release workflow's own extraction finds no block yet — this is the failing test). Use the printed value as `VER` below. If a tag line prints or `newer` is missing: STOP, **NEEDS JUDGEMENT**.
 
-- [ ] **Step 2: Add the block.** One edit in `rebalance.plg`, replacing `VER` in the new text with the printed value:
+- [x] **Step 2: Add the block.** One edit in `rebalance.plg`, replacing `VER` in the new text with the printed value:
 
 old:
 ```
@@ -896,11 +898,11 @@ new:
 ###2026.09.28###
 ```
 
-- [ ] **Step 3: Verify.** Re-run the Step 1 `awk ... | wc -l` with the same `VER` → `23`. `RUN_SYNTAX` → `syntax ok` (the plg still parses as XML). `grep -c $'\r' rebalance.plg` → `0`. `git diff --stat` → `rebalance.plg | 24 +` only (before the commit); `grep -n 'ENTITY version' rebalance.plg` still shows `"2026.09.28"`.
+- [x] **Step 3: Verify.** Re-run the Step 1 `awk ... | wc -l` with the same `VER` → `23`. `RUN_SYNTAX` → `syntax ok` (the plg still parses as XML). `grep -c $'\r' rebalance.plg` → `0`. `git diff --stat` → `rebalance.plg | 24 +` only (before the commit); `grep -n 'ENTITY version' rebalance.plg` still shows `"2026.09.28"`.
 
-- [ ] **Step 4: Commit** — `git add rebalance.plg && git commit -m "Changelog for <VER>"` (the repo's existing pattern, e.g. `76235c6 Changelog for 2026.09.28`). No tag, no push.
+- [x] **Step 4: Commit** — `git add rebalance.plg && git commit -m "Changelog for <VER>"` (the repo's existing pattern, e.g. `76235c6 Changelog for 2026.09.28`). No tag, no push.
 
-- [ ] **Step 5: Mutation** — `sed -i "s/^###$VER###\$/###x$VER###/" rebalance.plg`; the Step 1 `awk ... | wc -l` must print `0`; `git checkout -- rebalance.plg`; `git status --short` prints nothing.
+- [x] **Step 5: Mutation** — `sed -i "s/^###$VER###\$/###x$VER###/" rebalance.plg`; the Step 1 `awk ... | wc -l` must print `0`; `git checkout -- rebalance.plg`; `git status --short` prints nothing.
 
 ---
 
