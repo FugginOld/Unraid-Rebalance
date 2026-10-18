@@ -328,6 +328,7 @@ check "a ticked folder and a ticked file inside it on another disk never swap" '
 sel $'item\tdisk1\ttv/Show A (2001)' $'item\tdisk2\ttv/Show A (2001)' $'dest\tdisk1' $'dest\tdisk2'
 bash "$ENGINE" move-plan; rc=$?
 check "with only the two ticked disks as destinations the plan fails instead of swapping" '[[ $rc == 1 && $(st state) == error ]] && grep -q "PLAN-NOFIT.*disk1/tv/Show A (2001)" "$T/rb.log"'
+check "the error names the same-path rule, not only free space" '[[ $(st msg) == *"ticked item at the same path"* ]]'
 
 echo "== data move: files and links above Item depth move as their own units"
 make_fixture
@@ -338,6 +339,15 @@ sel $'item\tdisk1\ttv' $'dest\tdisk3'
 bash "$ENGINE" move-run; rc=$?
 check "a file above Item depth in a ticked share moves" '[[ $rc == 0 && $(st state) == done && $(cat "$T/mnt/disk3/tv/loose.nfo" 2>/dev/null) == loose && ! -e $T/mnt/disk1/tv/loose.nfo ]]'
 check "a link above Item depth in a ticked share moves as a link" '[[ -L "$T/mnt/disk3/tv/movies link" && ! -L "$T/mnt/disk1/tv/movies link" ]]'
+
+echo "== data move: a broken link above Item depth is a link like any other"
+make_fixture
+echo 'ITEM_DEPTH="2"' >> "$T/rb.cfg"
+ln -s nowhere "$T/mnt/disk1/tv/broken link"
+find "$T/mnt/disk1/tv" -exec touch -h -d '2 hours ago' {} +
+sel $'item\tdisk1\ttv' $'dest\tdisk3'
+bash "$ENGINE" move-run; rc=$?
+check "a broken link moves as a link instead of being skipped as 'no longer exists'" '[[ $rc == 0 && $(st state) == done && $(st skipped) == 0 && -L "$T/mnt/disk3/tv/broken link" && ! -L "$T/mnt/disk1/tv/broken link" ]]'
 
 echo "== data move: hidden entries, odd names and files outside shares are left behind, with a warning"
 make_fixture

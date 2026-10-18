@@ -442,7 +442,7 @@ plan_move() {   # Data Move planner: the ticked items onto the ticked disks. Wri
   log "Plan: $summary"
   if (( bad )); then   # D5: nothing moves while any ticked item cannot be placed
     write_move_script   # the move script shows what would have moved
-    die "$bad item(s) cannot be moved - they don't fit above the minimum free space or would overwrite a file. Nothing was moved; see the log"
+    die "$bad item(s) cannot be moved - they don't fit above the minimum free space, would overwrite a file, or would land on a ticked item at the same path. Nothing was moved; see the log"
   fi
   if (( plan_count == 0 )); then
     msg="Nothing can be moved - $plan_skipped item(s) left out (in-progress, hardlinked or excluded share)$left, see log"
@@ -580,7 +580,7 @@ while IFS=$'\t' read -r idx sz src dst rel; do
   wait_until_clear || break
   st_set cur_idx "$idx" cur_started "$EPOCHSECONDS" cur_cmd ""
   t0=$EPOCHSECONDS; reason=""
-  if   [[ ! -e $MNT/$src/$rel ]]; then reason="source no longer exists"
+  if   [[ ! -e $MNT/$src/$rel ]] && ! { $MOVE && [[ -L $MNT/$src/$rel ]]; }; then reason="source no longer exists"   # a broken link is still a link to move (Data Move only)
   elif $MOVE && unit_conflict "$src" "$dst" "$rel"; then reason="a file already exists at the same path on $dst"
   elif ! $MOVE && [[ -e $MNT/$dst/$rel ]]; then reason="already exists on $dst"
   elif (( $(df_avail "$dst") - sz < MIN_FREE_KB )); then reason="not enough free space on $dst"
