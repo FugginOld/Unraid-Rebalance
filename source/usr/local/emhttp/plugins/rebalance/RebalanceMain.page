@@ -58,9 +58,9 @@ Markdown="false"
         <div class="scale" id="rb-scale"></div>
         <span style="text-align:right">USED</span><span style="text-align:right">VS TARGET</span>
       </div>
-      <div id="rb-disks" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div id="rb-disks" style="display:flex;flex-direction:column;gap:4px"></div>
     </section>
-    <div style="flex:1 1 0;display:flex;flex-direction:column;gap:22px;min-width:0">
+    <div style="flex:1 1 0;display:flex;flex-direction:column;gap:12px;min-width:0">
       <section class="card">
         <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="h2">Up next</h2><span class="muted" id="rb-q-meta" style="font-size:13px"></span></div>
         <div class="list" id="rb-queue"></div>
